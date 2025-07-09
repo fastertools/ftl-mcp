@@ -1,7 +1,7 @@
 spin_manifest_version = 2
 
 [application]
-name = "mcp-components"
+name = "gateway-demo"
 version = "0.0.1"
 authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
 description = "MCP gateway with tool components"
@@ -23,13 +23,13 @@ route = "/test/add"
 component = "add"
 
 [component.mcp-gateway]
-source = "../../mcp-gateway/target/wasm32-wasip1/release/mcp_gateway.wasm"
+source = "../../src/mcp-gateway/target/wasm32-wasip1/release/mcp_gateway.wasm"
 allowed_outbound_hosts = ["http://*.spin.internal"]
 [component.mcp-gateway.variables]
 tool_components = "{{ tool_components }}"
 [component.mcp-gateway.build]
 command = "cargo build --target wasm32-wasip1 --release"
-workdir = "../../mcp-gateway"
+workdir = "../../src/mcp-gateway"
 watch = ["src/**/*.rs", "Cargo.toml"]
 
 # Internal components (not exposed via HTTP triggers)

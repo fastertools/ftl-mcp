@@ -9,7 +9,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "devDependencies": {
     "mkdirp": "^3.0.1",
     "webpack": "^5.74.0",

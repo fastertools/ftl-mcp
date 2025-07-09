@@ -3,6 +3,7 @@ name = "mcp-gateway"
 authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
 description = "MCP gateway component"
 version = "0.0.1"
+license = "Apache-2.0"
 rust-version = "1.78"
 edition = "2021"
 

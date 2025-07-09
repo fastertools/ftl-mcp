@@ -3,6 +3,7 @@ name = "echo"
 authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
 description = "Echo tool component"
 version = "0.1.0"
+license = "Apache-2.0"
 rust-version = "1.78"
 edition = "2021"
 

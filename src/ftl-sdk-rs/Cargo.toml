@@ -1,0 +1,68 @@
+[package]
+name = "ftl-sdk"
+version = "0.2.1"
+edition = "2021"
+description = "Thin SDK providing MCP protocol types for FTL tool development"
+license = "Apache-2.0"
+repository = "https://github.com/yourusername/ftl-mcp"
+documentation = "https://docs.rs/ftl-sdk"
+keywords = ["mcp", "ftl", "webassembly", "spin"]
+categories = ["web-programming", "wasm"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+serde_json = "1.0"
+pretty_assertions = "1.4"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Lint groups with lower priority
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+complexity = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+
+# Deny specific dangerous patterns
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unimplemented = "deny"
+todo = "deny"
+unreachable = "deny"
+mem_forget = "deny"
+cast_possible_truncation = "deny"
+cast_possible_wrap = "deny"
+cast_precision_loss = "deny"
+cast_sign_loss = "deny"
+indexing_slicing = "deny"
+unwrap_in_result = "deny"
+
+# Security and correctness
+enum_glob_use = "deny"
+exit = "deny"
+wildcard_imports = "deny"
+
+# Allow some pedantic lints that don't make sense for this project
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+missing_inline_in_public_items = "allow"
+impl_trait_in_params = "allow"
+must_use_candidate = "allow"
+return_self_not_must_use = "allow"
+used_underscore_binding = "allow"
+wildcard_in_or_patterns = "allow"
+redundant_pub_crate = "allow"
+missing_const_for_fn = "allow"
+exhaustive_structs = "allow"
+exhaustive_enums = "allow"

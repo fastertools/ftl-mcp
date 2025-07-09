@@ -1,0 +1,12 @@
+[build]
+# Enable maximum optimization for dependencies in dev builds
+[profile.dev.package."*"]
+opt-level = 3
+
+# Stricter checks during development
+[target.'cfg(all())']
+rustflags = [
+  "-D", "warnings",
+  "-D", "rust-2018-idioms",
+  "-D", "rust-2021-compatibility",
+]
