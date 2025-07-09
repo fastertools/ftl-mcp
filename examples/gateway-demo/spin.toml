@@ -2,19 +2,18 @@ spin_manifest_version = 2
 
 [application]
 name = "mcp-components"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
 description = "MCP gateway with tool components"
+
+[variables]
+tool_components = { default = "echo,add,echo-js,image-demo" }
 
 [[trigger.http]]
 route = "/mcp"
 component = "mcp-gateway"
 
 # Test endpoints to verify components work
-[[trigger.http]]
-route = "/test/tools-list"
-component = "tools-list"
-
 [[trigger.http]]
 route = "/test/echo"
 component = "echo"
@@ -24,22 +23,16 @@ route = "/test/add"
 component = "add"
 
 [component.mcp-gateway]
-source = "mcp-gateway/target/wasm32-wasip1/release/mcp_gateway.wasm"
+source = "../../mcp-gateway/target/wasm32-wasip1/release/mcp_gateway.wasm"
 allowed_outbound_hosts = ["http://*.spin.internal"]
+[component.mcp-gateway.variables]
+tool_components = "{{ tool_components }}"
 [component.mcp-gateway.build]
 command = "cargo build --target wasm32-wasip1 --release"
-workdir = "mcp-gateway"
+workdir = "../../mcp-gateway"
 watch = ["src/**/*.rs", "Cargo.toml"]
 
 # Internal components (not exposed via HTTP triggers)
-[component.tools-list]
-source = "tools-list/target/wasm32-wasip1/release/tools_list.wasm"
-allowed_outbound_hosts = []
-[component.tools-list.build]
-command = "cargo build --target wasm32-wasip1 --release"
-workdir = "tools-list"
-watch = ["src/**/*.rs", "Cargo.toml"]
-
 [component.echo]
 source = "echo/target/wasm32-wasip1/release/echo.wasm"
 allowed_outbound_hosts = []
@@ -66,3 +59,16 @@ allowed_outbound_hosts = []
 [component.echo-js.build]
 command = "npm install && npm run build"
 workdir = "echo-js"
+
+# Test endpoint for image demo
+[[trigger.http]]
+route = "/test/image-demo"
+component = "image-demo"
+
+[component.image-demo]
+source = "image-demo/target/wasm32-wasip1/release/image_demo.wasm"
+allowed_outbound_hosts = []
+[component.image-demo.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "image-demo"
+watch = ["src/**/*.rs", "Cargo.toml"]
