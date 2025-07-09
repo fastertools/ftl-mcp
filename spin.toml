@@ -1,0 +1,63 @@
+spin_manifest_version = 2
+
+[application]
+name = "wasmcp"
+version = "0.1.0"
+description = "MCP (Model Context Protocol) Framework on Spin"
+authors = ["Corey Ryan <corey@coreyr.com>"]
+
+# Plugin configuration is now component-level (see mcp-router.variables)
+
+# MCP HTTP Router Component
+[[trigger.http]]
+route = "/mcp"
+component = "mcp-router"
+
+[component.mcp-router]
+source = "mcp-router/target/wasm32-wasip1/release/mcp_router.wasm"
+allowed_outbound_hosts = ["http://*.spin.internal"]
+[component.mcp-router.variables]
+weather_plugin_name = "weather-new"
+weather_plugin_endpoint = "http://weather-new.spin.internal/weather-new/mcp"
+weather_plugin_tools = "get_weather"
+activity_plugin_name = "activity"
+activity_plugin_endpoint = "http://activity.spin.internal/activity/mcp"
+activity_plugin_tools = "random_activity"
+[component.mcp-router.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "mcp-router"
+
+# Weather Plugin Component - Using SDK (NEW)
+[[trigger.http]]
+route = "/weather-new/mcp"
+component = "weather-new"
+
+[component.weather-new]
+source = "weather_new/target/wasm32-wasip1/release/weather_new.wasm"
+allowed_outbound_hosts = ["https://api.open-meteo.com", "https://nominatim.openstreetmap.org"]
+[component.weather-new.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "weather_new"
+# Custom metadata using environment variables for dynamic discovery
+[component.weather-new.environment]
+MCP_ROUTE = "/weather-new/mcp"
+MCP_TOOLS = "get_weather"
+MCP_RESOURCES = ""
+MCP_PROMPTS = ""
+
+# Activity Plugin Component
+[[trigger.http]]
+route = "/activity/mcp"
+component = "activity"
+
+[component.activity]
+source = "quote_plugin/target/wasm32-wasip1/release/quote_plugin.wasm"
+allowed_outbound_hosts = ["https://bored-api.appbrewery.com"]
+[component.activity.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "quote_plugin"
+[component.activity.environment]
+MCP_ROUTE = "/activity/mcp"
+MCP_TOOLS = "random_activity"
+MCP_RESOURCES = ""
+MCP_PROMPTS = ""

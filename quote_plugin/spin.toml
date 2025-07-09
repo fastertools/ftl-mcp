@@ -1,0 +1,16 @@
+spin_manifest_version = 2
+
+[application]
+name = "activity-plugin"
+version = "0.1.0"
+description = "Random activity generator plugin"
+
+[[trigger.http]]
+route = "/activity/mcp"
+component = "activity"
+
+[component.activity]
+source = "target/wasm32-wasip1/release/quote_plugin.wasm"
+allowed_outbound_hosts = ["https://bored-api.appbrewery.com"]
+[component.activity.build]
+command = "cargo build --target wasm32-wasip1 --release"

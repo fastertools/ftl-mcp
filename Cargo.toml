@@ -1,0 +1,12 @@
+[workspace]
+members = [
+    "wasmcp",
+    "mcp-test-runner",
+]
+exclude = [
+    "mcp-http-server",
+    "mcp-plugin-rust-weather", 
+    "weather_new",
+    "weather_old",
+]
+resolver = "2"

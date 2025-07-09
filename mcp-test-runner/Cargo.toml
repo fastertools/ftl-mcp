@@ -1,0 +1,19 @@
+[package]
+name = "mcp-test-runner"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "mcp-test-runner"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+reqwest = { version = "0.11", features = ["json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+colored = "2.0"
+
+# Include wasmcp types for testing
+wasmcp = { path = "../wasmcp" }
