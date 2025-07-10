@@ -7,20 +7,11 @@ authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
 description = "MCP gateway with tool components"
 
 [variables]
-tool_components = { default = "echo,add,echo-js,image-demo" }
+tool_components = { default = "echo-rs,echo-ts,calculator-ts" }
 
 [[trigger.http]]
 route = "/mcp"
 component = "ftl-mcp-gateway"
-
-# Test endpoints to verify components work
-[[trigger.http]]
-route = "/test/echo"
-component = "echo"
-
-[[trigger.http]]
-route = "/test/add"
-component = "add"
 
 [component.ftl-mcp-gateway]
 source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.1" }
@@ -28,43 +19,38 @@ allowed_outbound_hosts = ["http://*.spin.internal"]
 [component.ftl-mcp-gateway.variables]
 tool_components = "{{ tool_components }}"
 
-# Internal components (not exposed via HTTP triggers)
-[component.echo]
-source = "echo/target/wasm32-wasip1/release/echo.wasm"
-allowed_outbound_hosts = []
-[component.echo.build]
-command = "cargo build --target wasm32-wasip1 --release"
-workdir = "echo"
-watch = ["src/**/*.rs", "Cargo.toml"]
+[[trigger.http]]
+route = "/test/echo-rs"
+component = "echo-rs"
 
-[component.add]
-source = "add/target/wasm32-wasip1/release/add.wasm"
+[component.echo-rs]
+source = "echo-rs/target/wasm32-wasip1/release/echo_rs.wasm"
 allowed_outbound_hosts = []
-[component.add.build]
+[component.echo-rs.build]
 command = "cargo build --target wasm32-wasip1 --release"
-workdir = "add"
+workdir = "echo-rs"
 watch = ["src/**/*.rs", "Cargo.toml"]
 
 [[trigger.http]]
-route = "/..."
-component = "echo-js"
+route = "/test/echo-ts"
+component = "echo-ts"
 
-[component.echo-js]
-source = "echo-js/dist/echo-js.wasm"
+[component.echo-ts]
+source = "echo-ts/dist/echo-ts.wasm"
 allowed_outbound_hosts = []
-[component.echo-js.build]
+
+[component.echo-ts.build]
 command = "npm install && npm run build"
-workdir = "echo-js"
+workdir = "echo-ts"
 
-# Test endpoint for image demo
 [[trigger.http]]
-route = "/test/image-demo"
-component = "image-demo"
+route = "/test/calculator-ts"
+component = "calculator-ts"
 
-[component.image-demo]
-source = "image-demo/target/wasm32-wasip1/release/image_demo.wasm"
+[component.calculator-ts]
+source = "calculator-ts/dist/calculator-ts.wasm"
 allowed_outbound_hosts = []
-[component.image-demo.build]
-command = "cargo build --target wasm32-wasip1 --release"
-workdir = "image-demo"
-watch = ["src/**/*.rs", "Cargo.toml"]
+
+[component.calculator-ts.build]
+command = "npm install && npm run build"
+workdir = "calculator-ts"

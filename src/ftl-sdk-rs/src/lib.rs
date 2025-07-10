@@ -4,6 +4,9 @@
 //! MCP-compliant tools. It does not include any HTTP server logic,
 //! allowing you to use any web framework of your choice.
 
+// Re-export macros when the feature is enabled
+#[cfg(feature = "macros")]
+pub use ftl_sdk_macros::{tool, tool_component};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

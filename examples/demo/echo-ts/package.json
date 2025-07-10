@@ -1,0 +1,24 @@
+{
+  "name": "echo-ts",
+  "version": "1.0.0",
+  "description": "Echo tool using ftl-sdk createTool helper",
+  "main": "index.js",
+  "scripts": {
+    "build": "npm run typecheck && esbuild src/index.ts --bundle --outfile=build/bundle.js --format=esm --platform=browser --external:node:* && mkdir -p dist && j2w -i build/bundle.js -o dist/echo-ts.wasm",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.19.0",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@spinframework/build-tools": "^1.0.1",
+    "@spinframework/wasi-http-proxy": "^1.0.0",
+    "ftl-sdk": "file:../../../src/ftl-sdk-ts",
+    "zod": "^4.0.3"
+  }
+}

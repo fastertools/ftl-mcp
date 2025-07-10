@@ -6,6 +6,9 @@
  * allowing you to use any web framework of your choice.
  */
 
+import type { JSONSchema } from './json-schema'
+export type { JSONSchema } from './json-schema'
+
 /**
  * Tool metadata returned by GET requests to tool endpoints
  */
@@ -20,10 +23,10 @@ export interface ToolMetadata {
   description?: string
 
   /** JSON Schema describing the expected input parameters */
-  inputSchema: Record<string, unknown>
+  inputSchema: JSONSchema
 
   /** Optional JSON Schema describing the output format */
-  outputSchema?: Record<string, unknown>
+  outputSchema?: JSONSchema
 
   /** Optional annotations providing hints about tool behavior */
   annotations?: ToolAnnotations
@@ -271,4 +274,108 @@ export function isAudioContent(content: ToolContent): content is AudioContent {
 
 export function isResourceContent(content: ToolContent): content is ResourceContent {
   return content.type === 'resource'
+}
+
+/**
+ * Handler function type for tool execution
+ */
+export type ToolHandler<T = unknown> = (input: T) => ToolResponse | Promise<ToolResponse>
+
+/**
+ * Options for creating a tool with metadata
+ */
+export interface CreateToolOptions<T = unknown> {
+  /** Tool metadata */
+  metadata: ToolMetadata
+  /** Handler function for tool execution */
+  handler: ToolHandler<T>
+}
+
+/**
+ * Creates a request handler configured to handle MCP tool requests.
+ *
+ * This helper provides a zero-dependency way to create a tool component that:
+ * - Returns metadata on GET requests
+ * - Executes the handler on POST requests
+ * - Handles errors gracefully
+ *
+ * @example
+ * ```typescript
+ * import { createTool, ToolResponse } from 'ftl-sdk'
+ *
+ * interface EchoRequest {
+ *   message: string
+ * }
+ *
+ * const handle = createTool({
+ *   metadata: {
+ *     name: 'echo',
+ *     title: 'Echo Tool',
+ *     description: 'Echoes back the input message',
+ *     inputSchema: {
+ *       type: 'object',
+ *       properties: {
+ *         message: { type: 'string' }
+ *       },
+ *       required: ['message']
+ *     }
+ *   },
+ *   handler: async (input: EchoRequest) => {
+ *     return ToolResponse.text(`Echo: ${input.message}`)
+ *   }
+ * })
+ *
+ * addEventListener('fetch', (event) => {
+ *   event.respondWith(handle(event.request))
+ * })
+ * ```
+ *
+ */
+export function createTool<T = unknown>(
+  options: CreateToolOptions<T>,
+): (request: Request) => Promise<Response> {
+  const { metadata, handler } = options
+
+  return async function handleRequest(request: Request): Promise<Response> {
+    const { method } = request
+
+    if (method === 'GET') {
+      // Return tool metadata
+      return new Response(JSON.stringify(metadata), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (method === 'POST') {
+      try {
+        // Parse request body
+        const input = (await request.json()) as T
+
+        // Execute handler
+        const response = await handler(input)
+
+        // Return response
+        return new Response(JSON.stringify(response), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      } catch (error) {
+        // Handle errors
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        const errorResponse = ToolResponse.error(`Tool execution failed: ${errorMessage}`)
+
+        return new Response(JSON.stringify(errorResponse), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
+    // Method not allowed
+    return new Response('Method not allowed', {
+      status: 405,
+      headers: { Allow: 'GET, POST' },
+    })
+  }
 }

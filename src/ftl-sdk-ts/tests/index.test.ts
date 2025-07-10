@@ -12,6 +12,7 @@ import {
   isImageContent,
   isAudioContent,
   isResourceContent,
+  createTool,
 } from '../src/index'
 
 describe('ToolResponse convenience methods', () => {
@@ -236,5 +237,123 @@ describe('JSON serialization', () => {
 
     const resourceContent = parsed.content[2] as ResourceContent
     expect(resourceContent.resource.uri).toBe('https://example.com/data')
+  })
+})
+
+describe('createTool helper', () => {
+  test('returns metadata on GET request', async () => {
+    const metadata: ToolMetadata = {
+      name: 'test-tool',
+      title: 'Test Tool',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          message: { type: 'string' },
+        },
+        required: ['message'],
+      },
+    }
+
+    const handle = createTool({
+      metadata,
+      handler: () => ToolResponse.text('test'),
+    })
+
+    const request = new Request('http://localhost/', { method: 'GET' })
+    const response = await handle(request)
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Type')).toBe('application/json')
+
+    const body = await response.json()
+    expect(body).toEqual(metadata)
+  })
+
+  test('executes handler on POST request', async () => {
+    interface TestInput {
+      message: string
+    }
+
+    const handle = createTool<TestInput>({
+      metadata: {
+        name: 'echo',
+        inputSchema: {},
+      },
+      handler: (input) => {
+        return ToolResponse.text(`Echo: ${input.message}`)
+      },
+    })
+
+    const request = new Request('http://localhost/', {
+      method: 'POST',
+      body: JSON.stringify({ message: 'Hello' }),
+      headers: { 'Content-Type': 'application/json' },
+    })
+
+    const response = await handle(request)
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Content-Type')).toBe('application/json')
+
+    const body = (await response.json()) as ToolResponseType
+    expect(body.content).toHaveLength(1)
+    expect(body.content[0].type).toBe('text')
+    expect((body.content[0] as TextContent).text).toBe('Echo: Hello')
+  })
+
+  test('returns error response on handler exception', async () => {
+    const handle = createTool({
+      metadata: {
+        name: 'failing-tool',
+        inputSchema: {},
+      },
+      handler: () => {
+        throw new Error('Handler failed')
+      },
+    })
+
+    const request = new Request('http://localhost/', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
+
+    const response = await handle(request)
+
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as ToolResponseType
+    expect(body.isError).toBe(true)
+    expect((body.content[0] as TextContent).text).toContain('Handler failed')
+  })
+
+  test('returns 405 for unsupported methods', async () => {
+    const handle = createTool({
+      metadata: { name: 'test', inputSchema: {} },
+      handler: () => ToolResponse.text('test'),
+    })
+
+    const request = new Request('http://localhost/', { method: 'PUT' })
+    const response = await handle(request)
+
+    expect(response.status).toBe(405)
+    expect(response.headers.get('Allow')).toBe('GET, POST')
+  })
+
+  test('handles invalid JSON in POST request', async () => {
+    const handle = createTool({
+      metadata: { name: 'test', inputSchema: {} },
+      handler: () => ToolResponse.text('test'),
+    })
+
+    const request = new Request('http://localhost/', {
+      method: 'POST',
+      body: 'invalid json',
+    })
+
+    const response = await handle(request)
+
+    expect(response.status).toBe(400)
+    const body = (await response.json()) as ToolResponseType
+    expect(body.isError).toBe(true)
+    expect((body.content[0] as TextContent).text).toContain('Tool execution failed')
   })
 })

@@ -12,9 +12,19 @@ checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 name = "ftl-sdk"
 version = "0.2.2"
 dependencies = [
+ "ftl-sdk-macros",
  "pretty_assertions",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "ftl-sdk-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

@@ -22,6 +22,11 @@ impl McpGateway {
         Self { config }
     }
 
+    /// Convert `snake_case` to kebab-case for component names
+    fn snake_to_kebab(name: &str) -> String {
+        name.replace('_', "-")
+    }
+
     pub async fn handle_request(&self, request: JsonRpcRequest) -> Option<JsonRpcResponse> {
         match request.method.as_str() {
             "initialize" => Some(self.handle_initialize(request)),
@@ -114,7 +119,9 @@ impl McpGateway {
 
         // Fetch metadata from each tool component
         for tool_name in tool_names {
-            let tool_url = format!("http://{tool_name}.spin.internal/");
+            // Convert snake_case to kebab-case for component names
+            let component_name = Self::snake_to_kebab(tool_name);
+            let tool_url = format!("http://{component_name}.spin.internal/");
 
             let req = Request::builder()
                 .method(Method::Get)
@@ -179,7 +186,9 @@ impl McpGateway {
         };
 
         // Call the specific tool component
-        let tool_url = format!("http://{}.spin.internal/", params.name);
+        // Convert snake_case to kebab-case for component names
+        let component_name = Self::snake_to_kebab(&params.name);
+        let tool_url = format!("http://{component_name}.spin.internal/");
 
         // Prepare the request body with just the arguments
         let tool_request_body = params.arguments.unwrap_or_else(|| serde_json::json!({}));
