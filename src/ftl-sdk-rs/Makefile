@@ -3,7 +3,7 @@
 all: format lint test build
 
 build:
-	cargo build --release
+	cargo build --release --target wasm32-wasip1
 
 test:
 	cargo test

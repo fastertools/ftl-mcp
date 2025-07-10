@@ -1,7 +1,7 @@
 [package]
-name = "add"
+name = "echo"
 authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
-description = "Add tool component"
+description = "Echo tool component"
 version = "0.1.0"
 license = "Apache-2.0"
 rust-version = "1.78"
@@ -15,5 +15,6 @@ anyhow = "1"
 spin-sdk = "3.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+ftl-sdk = "0.2.1"
 
 [workspace]

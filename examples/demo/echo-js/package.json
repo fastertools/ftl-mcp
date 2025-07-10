@@ -18,6 +18,7 @@
   "dependencies": {
     "itty-router": "^5.0.18",
     "@spinframework/build-tools": "^1.0.1",
-    "@spinframework/wasi-http-proxy": "^1.0.0"
+    "@spinframework/wasi-http-proxy": "^1.0.0",
+    "ftl-sdk": "^0.2.0"
   }
 }

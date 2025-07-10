@@ -1,24 +1,27 @@
 [package]
-name = "ftl-sdk"
-version = "0.2.2"
-edition = "2021"
-description = "Thin SDK providing MCP protocol types for FTL tool development"
+name = "ftl-mcp-gateway"
+authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
+description = "MCP gateway component"
+version = "0.0.1"
 license = "Apache-2.0"
+rust-version = "1.70"
+edition = "2021"
 repository = "https://github.com/fastertools/ftl-mcp"
-documentation = "https://github.com/fastertools/ftl-mcp"
-keywords = ["mcp", "ftl", "webassembly", "spin"]
+readme = "README.md"
+keywords = ["mcp", "gateway", "webassembly", "spin"]
 categories = ["web-programming", "wasm"]
 
 [lib]
-name = "ftl_sdk"
+name = "ftl_mcp_gateway"
+crate-type = ["cdylib"]
 
 [dependencies]
+anyhow = "1"
+spin-sdk = "3.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-[dev-dependencies]
-serde_json = "1.0"
-pretty_assertions = "1.4"
+tokio = { version = "1", features = ["macros", "rt"] }
+ftl-sdk = "0.2.1"
 
 [lints.rust]
 unsafe_code = "forbid"
@@ -69,3 +72,7 @@ redundant_pub_crate = "allow"
 missing_const_for_fn = "allow"
 exhaustive_structs = "allow"
 exhaustive_enums = "allow"
+future_not_send = "allow"
+multiple_crate_versions = "allow"
+
+[workspace]

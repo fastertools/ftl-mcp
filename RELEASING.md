@@ -42,7 +42,7 @@ npm run publish:dry-run  # Verifies the package
 
 Choose the appropriate version bump based on [Semantic Versioning](https://semver.org/):
 - **Patch** (0.0.x): Bug fixes, documentation updates
-- **Minor** (0.x.0): New features, backward compatible
+- **Minor** (0.x.0): New features, non-breaking additions
 - **Major** (x.0.0): Breaking changes
 
 #### Rust SDK

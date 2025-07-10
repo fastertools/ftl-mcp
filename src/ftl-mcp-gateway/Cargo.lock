@@ -145,6 +145,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "ftl-mcp-gateway"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "ftl-sdk",
+ "serde",
+ "serde_json",
+ "spin-sdk",
+ "tokio",
+]
+
+[[package]]
+name = "ftl-sdk"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36a3835e3632a34857bb5948bb658ecffe285f3224a1c2ab0ef796eef889c58a"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -350,17 +372,6 @@ name = "log"
 version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
-
-[[package]]
-name = "mcp-gateway"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "serde",
- "serde_json",
- "spin-sdk",
- "tokio",
-]
 
 [[package]]
 name = "memchr"

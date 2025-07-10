@@ -1,7 +1,12 @@
-use crate::mcp_types::*;
 use serde::{Deserialize, Serialize};
 use spin_sdk::http::{Method, Request, Response};
 use spin_sdk::variables;
+
+use crate::mcp_types::{
+    CallToolRequest, ErrorCode, InitializeRequest, InitializeResponse, JsonRpcRequest,
+    JsonRpcResponse, ListToolsResponse, McpProtocolVersion, ServerCapabilities, ServerInfo,
+    ToolContent, ToolMetadata, ToolResponse,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GatewayConfig {
@@ -23,10 +28,10 @@ impl McpGateway {
             "initialized" => {
                 // This is a notification, no response needed
                 None
-            },
+            }
             "tools/list" => Some(self.handle_list_tools(request).await),
             "tools/call" => Some(self.handle_call_tool(request).await),
-            "ping" => Some(self.handle_ping(request)),
+            "ping" => Some(Self::handle_ping(self, request)),
             _ => Some(JsonRpcResponse::error(
                 request.id,
                 ErrorCode::METHOD_NOT_FOUND.0,
@@ -43,7 +48,7 @@ impl McpGateway {
                     return JsonRpcResponse::error(
                         request.id,
                         ErrorCode::INVALID_PARAMS.0,
-                        &format!("Invalid initialize parameters: {}", e),
+                        &format!("Invalid initialize parameters: {e}"),
                     );
                 }
             },
@@ -75,11 +80,19 @@ impl McpGateway {
             instructions: Some(
                 "This MCP server provides access to tools via WebAssembly components. \
                  Each tool is implemented as an independent component with its own \
-                 capabilities and annotations.".to_string()
+                 capabilities and annotations."
+                    .to_string(),
             ),
         };
 
-        JsonRpcResponse::success(request.id, serde_json::to_value(response).unwrap())
+        match serde_json::to_value(response) {
+            Ok(value) => JsonRpcResponse::success(request.id, value),
+            Err(e) => JsonRpcResponse::error(
+                request.id,
+                ErrorCode::INTERNAL_ERROR.0,
+                &format!("Failed to serialize response: {e}"),
+            ),
+        }
     }
 
     async fn handle_list_tools(&self, request: JsonRpcRequest) -> JsonRpcResponse {
@@ -90,19 +103,19 @@ impl McpGateway {
                 return JsonRpcResponse::error(
                     request.id,
                     ErrorCode::INTERNAL_ERROR.0,
-                    &format!("Failed to get tool components configuration: {}", e),
+                    &format!("Failed to get tool components configuration: {e}"),
                 );
             }
         };
 
         // Parse the comma-separated list of tool names
-        let tool_names: Vec<&str> = tool_components.split(',').map(|s| s.trim()).collect();
+        let tool_names: Vec<&str> = tool_components.split(',').map(str::trim).collect();
         let mut tools = Vec::new();
 
         // Fetch metadata from each tool component
         for tool_name in tool_names {
-            let tool_url = format!("http://{}.spin.internal/", tool_name);
-            
+            let tool_url = format!("http://{tool_name}.spin.internal/");
+
             let req = Request::builder()
                 .method(Method::Get)
                 .uri(&tool_url)
@@ -111,26 +124,37 @@ impl McpGateway {
             match spin_sdk::http::send::<_, spin_sdk::http::Response>(req).await {
                 Ok(resp) => {
                     if *resp.status() == 200 {
-                        match serde_json::from_slice::<Tool>(resp.body()) {
+                        match serde_json::from_slice::<ToolMetadata>(resp.body()) {
                             Ok(tool) => tools.push(tool),
                             Err(e) => {
-                                eprintln!("Failed to parse metadata from tool '{}': {}", tool_name, e);
+                                eprintln!("Failed to parse metadata from tool '{tool_name}': {e}");
                                 // Continue with other tools even if one fails
                             }
                         }
                     } else {
-                        eprintln!("Tool '{}' returned status {} for metadata request", tool_name, resp.status());
+                        eprintln!(
+                            "Tool '{}' returned status {} for metadata request",
+                            tool_name,
+                            resp.status()
+                        );
                     }
                 }
                 Err(e) => {
-                    eprintln!("Failed to fetch metadata from tool '{}': {}", tool_name, e);
+                    eprintln!("Failed to fetch metadata from tool '{tool_name}': {e}");
                     // Continue with other tools even if one fails
                 }
             }
         }
 
         let response = ListToolsResponse { tools };
-        JsonRpcResponse::success(request.id, serde_json::to_value(response).unwrap())
+        match serde_json::to_value(response) {
+            Ok(value) => JsonRpcResponse::success(request.id, value),
+            Err(e) => JsonRpcResponse::error(
+                request.id,
+                ErrorCode::INTERNAL_ERROR.0,
+                &format!("Failed to serialize response: {e}"),
+            ),
+        }
     }
 
     async fn handle_call_tool(&self, request: JsonRpcRequest) -> JsonRpcResponse {
@@ -141,7 +165,7 @@ impl McpGateway {
                     return JsonRpcResponse::error(
                         request.id,
                         ErrorCode::INVALID_PARAMS.0,
-                        &format!("Invalid call tool parameters: {}", e),
+                        &format!("Invalid call tool parameters: {e}"),
                     );
                 }
             },
@@ -156,15 +180,18 @@ impl McpGateway {
 
         // Call the specific tool component
         let tool_url = format!("http://{}.spin.internal/", params.name);
-        
+
         // Prepare the request body with just the arguments
-        let tool_request_body = params.arguments.unwrap_or(serde_json::json!({}));
-        
+        let tool_request_body = params.arguments.unwrap_or_else(|| serde_json::json!({}));
+
         let req = Request::builder()
             .method(Method::Post)
             .uri(&tool_url)
             .header("Content-Type", "application/json")
-            .body(serde_json::to_vec(&tool_request_body).unwrap())
+            .body(
+                serde_json::to_vec(&tool_request_body)
+                    .unwrap_or_else(|_| br#"{"error":"Failed to serialize request"}"#.to_vec()),
+            )
             .build();
 
         match spin_sdk::http::send::<_, spin_sdk::http::Response>(req).await {
@@ -173,92 +200,40 @@ impl McpGateway {
                 let body = resp.body();
 
                 if *status == 200 {
-                    // Success - check if tool returned MCP-formatted response or raw JSON
-                    match serde_json::from_slice::<CallToolResponse>(body) {
-                        Ok(tool_response) => {
-                            // Tool returned proper MCP response format
-                            JsonRpcResponse::success(request.id, serde_json::to_value(tool_response).unwrap())
-                        }
-                        Err(_) => {
-                            // Check if tool returned simple content array format
-                            #[derive(Deserialize)]
-                            struct SimpleResponse {
-                                content: Vec<serde_json::Value>,
-                            }
-                            
-                            match serde_json::from_slice::<SimpleResponse>(body) {
-                                Ok(simple_response) => {
-                                    // Convert simple response to MCP format
-                                    let tool_response = CallToolResponse {
-                                        content: simple_response.content.into_iter().filter_map(|v| {
-                                            serde_json::from_value::<ToolContent>(v).ok()
-                                        }).collect(),
-                                        structured_content: None,
-                                        is_error: None,
-                                    };
-                                    JsonRpcResponse::success(request.id, serde_json::to_value(tool_response).unwrap())
-                                }
-                                Err(_) => {
-                                    // Tool returned raw JSON - wrap it in MCP format
-                                    match serde_json::from_slice::<serde_json::Value>(body) {
-                                        Ok(result) => {
-                                            let tool_response = CallToolResponse {
-                                                content: vec![ToolContent::Text {
-                                                    text: serde_json::to_string_pretty(&result).unwrap_or(result.to_string()),
-                                                    annotations: None,
-                                                }],
-                                                structured_content: None,
-                                                is_error: None,
-                                            };
-                                            JsonRpcResponse::success(request.id, serde_json::to_value(tool_response).unwrap())
-                                        }
-                                        Err(e) => JsonRpcResponse::error(
-                                            request.id,
-                                            ErrorCode::INTERNAL_ERROR.0,
-                                            &format!("Invalid tool response: {}", e),
-                                        ),
-                                    }
-                                }
-                            }
-                        }
+                    // Success - tool must return MCP-formatted response
+                    match serde_json::from_slice::<ToolResponse>(body) {
+                        Ok(tool_response) => match serde_json::to_value(tool_response) {
+                            Ok(value) => JsonRpcResponse::success(request.id, value),
+                            Err(e) => JsonRpcResponse::error(
+                                request.id,
+                                ErrorCode::INTERNAL_ERROR.0,
+                                &format!("Failed to serialize tool response: {e}"),
+                            ),
+                        },
+                        Err(e) => JsonRpcResponse::error(
+                            request.id,
+                            ErrorCode::INTERNAL_ERROR.0,
+                            &format!("Tool returned invalid response format: {e}"),
+                        ),
                     }
                 } else {
-                    // Error - check if we have an MCP-formatted error response
-                    match serde_json::from_slice::<CallToolResponse>(body) {
-                        Ok(tool_response) if tool_response.is_error.unwrap_or(false) => {
-                            // Tool returned error in MCP format
-                            JsonRpcResponse::success(request.id, serde_json::to_value(tool_response).unwrap())
-                        }
-                        _ => {
-                            // Check for legacy error format or plain text
-                            match serde_json::from_slice::<ToolError>(body) {
-                                Ok(tool_error) => {
-                                    // Convert legacy error to MCP format
-                                    let tool_response = CallToolResponse {
-                                        content: vec![ToolContent::Text {
-                                            text: tool_error.error.clone(),
-                                            annotations: None,
-                                        }],
-                                        structured_content: None,
-                                        is_error: Some(true),
-                                    };
-                                    JsonRpcResponse::success(request.id, serde_json::to_value(tool_response).unwrap())
-                                }
-                                Err(_) => {
-                                    // Fallback to wrapping plain text error
-                                    let error_text = String::from_utf8_lossy(body);
-                                    let tool_response = CallToolResponse {
-                                        content: vec![ToolContent::Text {
-                                            text: format!("Tool execution failed (status {}): {}", status, error_text),
-                                            annotations: None,
-                                        }],
-                                        structured_content: None,
-                                        is_error: Some(true),
-                                    };
-                                    JsonRpcResponse::success(request.id, serde_json::to_value(tool_response).unwrap())
-                                }
-                            }
-                        }
+                    // Error response from tool
+                    let error_text = String::from_utf8_lossy(body);
+                    let tool_response = ToolResponse {
+                        content: vec![ToolContent::Text {
+                            text: format!("Tool execution failed (status {status}): {error_text}"),
+                            annotations: None,
+                        }],
+                        structured_content: None,
+                        is_error: Some(true),
+                    };
+                    match serde_json::to_value(tool_response) {
+                        Ok(value) => JsonRpcResponse::success(request.id, value),
+                        Err(e) => JsonRpcResponse::error(
+                            request.id,
+                            ErrorCode::INTERNAL_ERROR.0,
+                            &format!("Failed to serialize tool response: {e}"),
+                        ),
                     }
                 }
             }
@@ -269,8 +244,8 @@ impl McpGateway {
             ),
         }
     }
-    
-    fn handle_ping(&self, request: JsonRpcRequest) -> JsonRpcResponse {
+
+    fn handle_ping(_gateway: &Self, request: JsonRpcRequest) -> JsonRpcResponse {
         JsonRpcResponse::success(request.id, serde_json::json!({}))
     }
 }
@@ -302,13 +277,15 @@ pub async fn handle_mcp_request(req: Request) -> Response {
             let error_response = JsonRpcResponse::error(
                 None,
                 ErrorCode::PARSE_ERROR.0,
-                &format!("Invalid JSON-RPC request: {}", e),
+                &format!("Invalid JSON-RPC request: {e}"),
             );
             return Response::builder()
                 .status(200)
                 .header("Content-Type", "application/json")
                 .header("Access-Control-Allow-Origin", "*")
-                .body(serde_json::to_vec(&error_response).unwrap())
+                .body(serde_json::to_vec(&error_response).unwrap_or_else(|_| {
+                    br#"{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal serialization error"}}"#.to_vec()
+                }))
                 .build();
         }
     };
@@ -323,16 +300,8 @@ pub async fn handle_mcp_request(req: Request) -> Response {
     let gateway = McpGateway::new(config);
 
     // Handle the request
-    match gateway.handle_request(request).await {
-        Some(response) => {
-            Response::builder()
-                .status(200)
-                .header("Content-Type", "application/json")
-                .header("Access-Control-Allow-Origin", "*")
-                .body(serde_json::to_vec(&response).unwrap())
-                .build()
-        }
-        None => {
+    gateway.handle_request(request).await.map_or_else(
+        || {
             // Notification - return empty response
             Response::builder()
                 .status(200)
@@ -340,6 +309,16 @@ pub async fn handle_mcp_request(req: Request) -> Response {
                 .header("Access-Control-Allow-Origin", "*")
                 .body(Vec::new())
                 .build()
-        }
-    }
+        },
+        |response| {
+            Response::builder()
+                .status(200)
+                .header("Content-Type", "application/json")
+                .header("Access-Control-Allow-Origin", "*")
+                .body(serde_json::to_vec(&response).unwrap_or_else(|_| {
+                    br#"{"jsonrpc":"2.0","error":{"code":-32603,"message":"Internal serialization error"}}"#.to_vec()
+                }))
+                .build()
+        },
+    )
 }
