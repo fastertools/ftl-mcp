@@ -1,0 +1,110 @@
+spin_manifest_version = 2
+
+[application]
+name = "gateway-demo-auth"
+version = "0.0.1"
+authors = ["FTL Contributors"]
+description = "MCP gateway with AuthKit authentication"
+
+[variables]
+tool_components = { default = "echo-rs,echo-ts,calculator-ts,weather-ts,weather-rs" }
+# AuthKit configuration variables
+authkit_issuer = { default = "https://divine-lion-50-staging.authkit.app" }
+authkit_audience = { default = "" }
+authkit_jwks_uri = { default = "" }
+mcp_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal/mcp-internal" }
+
+# Auth gateway handles the public /mcp endpoint and metadata endpoints
+[[trigger.http]]
+route = "/mcp"
+component = "ftl-auth-gateway"
+
+[[trigger.http]]
+route = "/.well-known/..."
+component = "ftl-auth-gateway"
+
+[component.ftl-auth-gateway]
+source = "../../src/ftl-auth-gateway/target/wasm32-wasip1/release/ftl_auth_gateway.wasm"
+allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app", "https://divine-lion-50-staging.authkit.app"]
+[component.ftl-auth-gateway.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "../../src/ftl-auth-gateway"
+watch = ["src/**/*.rs", "Cargo.toml"]
+[component.ftl-auth-gateway.variables]
+authkit_issuer = "{{ authkit_issuer }}"
+authkit_audience = "{{ authkit_audience }}"
+authkit_jwks_uri = "{{ authkit_jwks_uri }}"
+mcp_gateway_url = "{{ mcp_gateway_url }}"
+
+# MCP gateway now handles internal requests only
+[[trigger.http]]
+route = "/mcp-internal"
+component = "ftl-mcp-gateway"
+
+[component.ftl-mcp-gateway]
+source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.3" }
+allowed_outbound_hosts = ["http://*.spin.internal"]
+[component.ftl-mcp-gateway.variables]
+tool_components = "{{ tool_components }}"
+validate_arguments = "true"
+
+# Tool components remain the same
+[[trigger.http]]
+route = "/test/echo-rs"
+component = "echo-rs"
+
+[component.echo-rs]
+source = "echo-rs/target/wasm32-wasip1/release/echo_rs.wasm"
+allowed_outbound_hosts = []
+[component.echo-rs.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "echo-rs"
+watch = ["src/**/*.rs", "Cargo.toml"]
+
+[[trigger.http]]
+route = "/test/echo-ts"
+component = "echo-ts"
+
+[component.echo-ts]
+source = "echo-ts/dist/echo-ts.wasm"
+allowed_outbound_hosts = []
+
+[component.echo-ts.build]
+command = "npm install && npm run build"
+workdir = "echo-ts"
+
+[[trigger.http]]
+route = "/test/calculator-ts"
+component = "calculator-ts"
+
+[component.calculator-ts]
+source = "calculator-ts/dist/calculator-ts.wasm"
+allowed_outbound_hosts = []
+
+[component.calculator-ts.build]
+command = "npm install && npm run build"
+workdir = "calculator-ts"
+
+[[trigger.http]]
+route = "/test/weather-ts"
+component = "weather-ts"
+
+[component.weather-ts]
+source = "weather-ts/dist/weather-ts.wasm"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+
+[component.weather-ts.build]
+command = "npm install && npm run build"
+workdir = "weather-ts"
+
+[[trigger.http]]
+route = "/test/weather-rs"
+component = "weather-rs"
+
+[component.weather-rs]
+source = "weather-rs/target/wasm32-wasip1/release/weather_rs.wasm"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+[component.weather-rs.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "weather-rs"
+watch = ["src/**/*.rs", "Cargo.toml"]
