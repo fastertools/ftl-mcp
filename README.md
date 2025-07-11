@@ -4,7 +4,7 @@
 
 </div>
 
-A WebAssembly-based implementation of the Model Context Protocol (MCP) for building secure, fast, deployable AI tools in any language.
+A WebAssembly-based implementation of the Model Context Protocol (MCP) for building secure, fast, deployable AI tools in any language that run efficiently on almost any type of compute.
 
 ## Quick Start
 
