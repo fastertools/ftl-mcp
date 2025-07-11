@@ -1,0 +1,80 @@
+spin_manifest_version = 2
+
+[application]
+name = "gateway-demo"
+version = "0.0.1"
+authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
+description = "MCP gateway with tool components"
+
+[variables]
+tool_components = { default = "echo-rs,echo-ts,calculator-ts,weather-ts,weather-rs" }
+
+[[trigger.http]]
+route = "/mcp"
+component = "ftl-mcp-gateway"
+
+[component.ftl-mcp-gateway]
+source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.1" }
+allowed_outbound_hosts = ["http://*.spin.internal"]
+[component.ftl-mcp-gateway.variables]
+tool_components = "{{ tool_components }}"
+
+[[trigger.http]]
+route = "/test/echo-rs"
+component = "echo-rs"
+
+[component.echo-rs]
+source = "echo-rs/target/wasm32-wasip1/release/echo_rs.wasm"
+allowed_outbound_hosts = []
+[component.echo-rs.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "echo-rs"
+watch = ["src/**/*.rs", "Cargo.toml"]
+
+[[trigger.http]]
+route = "/test/echo-ts"
+component = "echo-ts"
+
+[component.echo-ts]
+source = "echo-ts/dist/echo-ts.wasm"
+allowed_outbound_hosts = []
+
+[component.echo-ts.build]
+command = "npm install && npm run build"
+workdir = "echo-ts"
+
+[[trigger.http]]
+route = "/test/calculator-ts"
+component = "calculator-ts"
+
+[component.calculator-ts]
+source = "calculator-ts/dist/calculator-ts.wasm"
+allowed_outbound_hosts = []
+
+[component.calculator-ts.build]
+command = "npm install && npm run build"
+workdir = "calculator-ts"
+
+[[trigger.http]]
+route = "/test/weather-ts"
+component = "weather-ts"
+
+[component.weather-ts]
+source = "weather-ts/dist/weather-ts.wasm"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+
+[component.weather-ts.build]
+command = "npm install && npm run build"
+workdir = "weather-ts"
+
+[[trigger.http]]
+route = "/test/weather-rs"
+component = "weather-rs"
+
+[component.weather-rs]
+source = "weather-rs/target/wasm32-wasip1/release/weather_rs.wasm"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+[component.weather-rs.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "weather-rs"
+watch = ["src/**/*.rs", "Cargo.toml"]

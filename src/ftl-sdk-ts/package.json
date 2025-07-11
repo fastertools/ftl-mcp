@@ -1,0 +1,62 @@
+{
+  "name": "ftl-sdk",
+  "version": "0.2.2",
+  "description": "Thin SDK providing MCP protocol types for FTL tool development",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src tests --ext .ts",
+    "lint:fix": "eslint src tests --ext .ts --fix",
+    "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "check": "npm run format:check && npm run lint && npm run test",
+    "prepublishOnly": "npm run check && npm run build",
+    "publish:dry-run": "npm publish --dry-run",
+    "publish:npm": "npm publish --access public",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
+    "release:patch": "npm run version:patch && npm run publish:npm",
+    "release:minor": "npm run version:minor && npm run publish:npm",
+    "release:major": "npm run version:major && npm run publish:npm"
+  },
+  "keywords": [
+    "mcp",
+    "ftl",
+    "webassembly",
+    "spin",
+    "tools"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.8.3",
+    "vitest": "^1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fastertools/ftl-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/fastertools/ftl-mcp/issues"
+  },
+  "homepage": "https://github.com/fastertools/ftl-mcp#readme"
+}

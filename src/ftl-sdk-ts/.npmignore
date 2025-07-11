@@ -1,0 +1,36 @@
+# Source files (only publish dist)
+src/
+tests/
+
+# Config files
+.eslintrc.js
+.prettierrc
+.prettierignore
+.eslintignore
+tsconfig.json
+vitest.config.ts
+
+# Development files
+*.log
+.DS_Store
+coverage/
+.nyc_output/
+
+# Git files
+.git/
+.gitignore
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Lock files (consumers should generate their own)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Documentation that's not needed in package
+*.md
+!README.md
