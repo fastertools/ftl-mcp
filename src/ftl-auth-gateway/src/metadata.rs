@@ -1,5 +1,5 @@
 use anyhow::Result;
-use spin_sdk::http::Response;
+use spin_sdk::http::{Request, Response};
 
 use crate::auth::AuthKitConfig;
 
@@ -8,6 +8,7 @@ pub fn handle_metadata_request(
     path: &str,
     config: &AuthKitConfig,
     host: Option<&str>,
+    req: &Request,
 ) -> Result<Response> {
     match path {
         "/.well-known/oauth-protected-resource" => {
@@ -15,11 +16,32 @@ pub fn handle_metadata_request(
             // Use the exact host header sent by the client
             let resource_url = match host {
                 Some(h) => {
-                    // Host header doesn't include protocol, so we need to determine it
-                    let protocol = if h.contains(":443") { "https" } else { "http" };
-                    format!("{}://{}/mcp", protocol, h)
+                    // Check X-Forwarded-Proto header for protocol
+                    let forwarded_proto = req
+                        .headers()
+                        .find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-proto"))
+                        .and_then(|(_, value)| value.as_str());
+                    
+                    // Determine protocol
+                    let protocol = if let Some(proto) = forwarded_proto {
+                        proto
+                    } else if h.contains(":443") || h.contains(".fermyon.tech") || h.contains(".fermyon.cloud") {
+                        "https"
+                    } else if h.contains(":80") || h.starts_with("localhost") || h.starts_with("127.0.0.1") {
+                        "http"
+                    } else {
+                        // Default to https for production domains
+                        "https"
+                    };
+                    
+                    let url = format!("{}://{}/mcp", protocol, h);
+                    eprintln!("Returning resource URL: {}", url);
+                    url
                 }
-                None => "http://127.0.0.1:3000/mcp".to_string(), // Default to 127.0.0.1 as that's what clients typically use
+                None => {
+                    eprintln!("No host header found, using default");
+                    "http://127.0.0.1:3000/mcp".to_string() // Default fallback
+                }
             };
 
             let metadata = serde_json::json!({

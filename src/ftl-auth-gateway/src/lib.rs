@@ -37,17 +37,45 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
     let method = req.method();
 
     // Extract host header for metadata endpoints
+    // Check multiple headers that might contain the host
     let host = req
         .headers()
         .find(|(name, _)| name.eq_ignore_ascii_case("host"))
-        .and_then(|(_, value)| value.as_str());
+        .and_then(|(_, value)| value.as_str())
+        .or_else(|| {
+            req.headers()
+                .find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-host"))
+                .and_then(|(_, value)| value.as_str())
+        })
+        .or_else(|| {
+            req.headers()
+                .find(|(name, _)| name.eq_ignore_ascii_case("x-original-host"))
+                .and_then(|(_, value)| value.as_str())
+        });
+    
+    // Only log headers for metadata endpoints to reduce noise
+    if matches!(path, "/.well-known/oauth-protected-resource" | "/.well-known/oauth-authorization-server") {
+        eprintln!("=== Metadata request to {} ===", path);
+        eprintln!("Selected host: {:?}", host);
+        
+        // Log specific headers we care about
+        if let Some((_, value)) = req.headers().find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-host")) {
+            eprintln!("X-Forwarded-Host: {:?}", value.as_str());
+        }
+        if let Some((_, value)) = req.headers().find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-proto")) {
+            eprintln!("X-Forwarded-Proto: {:?}", value.as_str());
+        }
+        if let Some((_, value)) = req.headers().find(|(name, _)| name.eq_ignore_ascii_case("host")) {
+            eprintln!("Host: {:?}", value.as_str());
+        }
+    }
 
     // Handle metadata endpoints (no auth required)
     if matches!(
         path,
         "/.well-known/oauth-protected-resource" | "/.well-known/oauth-authorization-server"
     ) {
-        return handle_metadata_request(path, &config, host);
+        return handle_metadata_request(path, &config, host, &req);
     }
 
     // Handle OPTIONS requests (CORS preflight)
