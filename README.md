@@ -61,7 +61,7 @@ addEventListener('fetch', (event: FetchEvent) => {
 
 ## Why?
 
-`ftl-mcp` enables you to build MCP servers that run as WebAssembly components on the wasmtime-based Spin framework. FTL toolkits can be deployed to extremely fast, globally distributed Akamai edge workers via Fermyon. Each tool is isolated in its own sandbox with capability-based permissions, providing a secure execution environment for each tool call.
+`ftl-mcp` enables you to build MCP-compatible toolkits that run as WebAssembly components on the wasmtime-based Spin framework. FTL toolkits can be natively deployed to extremely fast, globally distributed Akamai edge workers via Fermyon. They can also run on any WebAssembly-compatible host. Each tool executes within its own isolated sandbox with capability-based permissions, providing a secure execution environment for each tool call. You can mix and match tools written in different source languages within a toolkit.
 
 ## Architecture
 
