@@ -14,10 +14,11 @@ route = "/mcp"
 component = "ftl-mcp-gateway"
 
 [component.ftl-mcp-gateway]
-source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.2" }
+source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.3" }
 allowed_outbound_hosts = ["http://*.spin.internal"]
 [component.ftl-mcp-gateway.variables]
 tool_components = "{{ tool_components }}"
+validate_arguments = "true"
 
 [[trigger.http]]
 route = "/test/echo-rs"
