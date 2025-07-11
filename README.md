@@ -4,7 +4,7 @@
 
 </div>
 
-A WebAssembly-based implementation of the Model Context Protocol (MCP) for building secure, fast, deployable AI tools in any language that run efficiently on almost any type of compute.
+A WebAssembly-based implementation of the Model Context Protocol (MCP) for building secure, fast, deployable tools that plug in to any AI agent and run efficiently on almost any type of compute.
 
 ## Quick Start
 
@@ -20,13 +20,16 @@ use schemars::JsonSchema;
 
 #[derive(Deserialize, JsonSchema)]
 struct EchoInput {
+    /// The message to echo back to the caller, verbatim
     message: String
 }
 
+/// Echo the message back to the caller
 #[tool]
-fn echo(input: EchoInput) -> ToolResponse {
+fn echo_rs(input: EchoInput) -> ToolResponse {
     ToolResponse::text(format!("Echo: {}", input.message))
 }
+
 ```
 </details>
 
@@ -37,24 +40,31 @@ fn echo(input: EchoInput) -> ToolResponse {
 import { createTool, ToolResponse } from 'ftl-sdk'
 import { z } from 'zod'
 
-const InputSchema = z.object({
-  message: z.string().describe('The message to echo')
+// Define the schema using Zod
+const EchoInputSchema = z.object({
+  message: z.string().describe('The message to echo back to the caller, verbatim')
 })
 
-const handle = createTool<z.infer<typeof InputSchema>>({
+// Derive TypeScript type from the schema
+type EchoInput = z.infer<typeof EchoInputSchema>
+
+const echo = createTool<EchoInput>({
   metadata: {
-    name: 'echo',
-    title: 'Echo Tool',
-    description: 'Echoes back the input message',
-    inputSchema: z.toJSONSchema(InputSchema)
+    name: 'echo_ts',
+    title: 'Echo TS',
+    description: 'Echo the message back to the caller',
+    // Using Zod v4's native JSON Schema conversion
+    inputSchema: z.toJSONSchema(EchoInputSchema)
   },
   handler: async (input) => {
+    // Input is pre-validated
     return ToolResponse.text(`Echo: ${input.message}`)
   }
 })
 
+//@ts-ignore
 addEventListener('fetch', (event: FetchEvent) => {
-  event.respondWith(handle(event.request))
+  event.respondWith(echo(event.request))
 })
 ```
 </details>
