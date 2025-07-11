@@ -6,10 +6,6 @@
 
 A WebAssembly-based implementation of the Model Context Protocol (MCP) for building secure, fast, deployable AI tools in any language.
 
-## Why?
-
-`ftl-mcp` enables you to build MCP servers that run as WebAssembly components on the wasmtime-based Spin framework. FTL toolkits can be deployed to extremely fast, globally distributed Akamai edge workers via Fermyon. Each tool is isolated in its own sandbox with capability-based permissions, providing a secure execution environment for each tool call.
-
 ## Quick Start
 
 ### Writing a Tool
@@ -62,6 +58,10 @@ addEventListener('fetch', (event: FetchEvent) => {
 })
 ```
 </details>
+
+## Why?
+
+`ftl-mcp` enables you to build MCP servers that run as WebAssembly components on the wasmtime-based Spin framework. FTL toolkits can be deployed to extremely fast, globally distributed Akamai edge workers via Fermyon. Each tool is isolated in its own sandbox with capability-based permissions, providing a secure execution environment for each tool call.
 
 ## Architecture
 
