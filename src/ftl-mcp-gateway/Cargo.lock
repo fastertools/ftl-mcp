@@ -146,10 +146,11 @@ dependencies = [
 
 [[package]]
 name = "ftl-mcp-gateway"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "ftl-sdk",
+ "futures",
  "serde",
  "serde_json",
  "spin-sdk",

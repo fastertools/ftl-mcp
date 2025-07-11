@@ -115,43 +115,57 @@ impl McpGateway {
 
         // Parse the comma-separated list of tool names
         let tool_names: Vec<&str> = tool_components.split(',').map(str::trim).collect();
-        let mut tools = Vec::new();
 
-        // Fetch metadata from each tool component
-        for tool_name in tool_names {
-            // Convert snake_case to kebab-case for component names
-            let component_name = Self::snake_to_kebab(tool_name);
-            let tool_url = format!("http://{component_name}.spin.internal/");
+        // Create futures for fetching metadata from all tools in parallel
+        let metadata_futures: Vec<_> = tool_names
+            .iter()
+            .map(|tool_name| {
+                let tool_name = (*tool_name).to_string();
+                async move {
+                    // Convert snake_case to kebab-case for component names
+                    let component_name = Self::snake_to_kebab(&tool_name);
+                    let tool_url = format!("http://{component_name}.spin.internal/");
 
-            let req = Request::builder()
-                .method(Method::Get)
-                .uri(&tool_url)
-                .build();
+                    let req = Request::builder()
+                        .method(Method::Get)
+                        .uri(&tool_url)
+                        .build();
 
-            match spin_sdk::http::send::<_, spin_sdk::http::Response>(req).await {
-                Ok(resp) => {
-                    if *resp.status() == 200 {
-                        match serde_json::from_slice::<ToolMetadata>(resp.body()) {
-                            Ok(tool) => tools.push(tool),
-                            Err(e) => {
-                                eprintln!("Failed to parse metadata from tool '{tool_name}': {e}");
-                                // Continue with other tools even if one fails
+                    match spin_sdk::http::send::<_, spin_sdk::http::Response>(req).await {
+                        Ok(resp) => {
+                            if *resp.status() == 200 {
+                                match serde_json::from_slice::<ToolMetadata>(resp.body()) {
+                                    Ok(tool) => Some(tool),
+                                    Err(e) => {
+                                        eprintln!(
+                                            "Failed to parse metadata from tool '{tool_name}': {e}"
+                                        );
+                                        None
+                                    }
+                                }
+                            } else {
+                                eprintln!(
+                                    "Tool '{}' returned status {} for metadata request",
+                                    tool_name,
+                                    resp.status()
+                                );
+                                None
                             }
                         }
-                    } else {
-                        eprintln!(
-                            "Tool '{}' returned status {} for metadata request",
-                            tool_name,
-                            resp.status()
-                        );
+                        Err(e) => {
+                            eprintln!("Failed to fetch metadata from tool '{tool_name}': {e}");
+                            None
+                        }
                     }
                 }
-                Err(e) => {
-                    eprintln!("Failed to fetch metadata from tool '{tool_name}': {e}");
-                    // Continue with other tools even if one fails
-                }
-            }
-        }
+            })
+            .collect();
+
+        // Execute all futures concurrently and collect results
+        let results = futures::future::join_all(metadata_futures).await;
+
+        // Filter out None values and collect successful tool metadata
+        let tools: Vec<ToolMetadata> = results.into_iter().flatten().collect();
 
         let response = ListToolsResponse { tools };
         match serde_json::to_value(response) {
@@ -302,8 +316,8 @@ pub async fn handle_mcp_request(req: Request) -> Response {
     // Create gateway with config
     let config = GatewayConfig {
         server_info: ServerInfo {
-            name: "mcp-gateway".to_string(),
-            version: "0.1.0".to_string(),
+            name: "ftl-mcp-gateway".to_string(),
+            version: "0.0.2".to_string(),
         },
     };
     let gateway = McpGateway::new(config);
