@@ -4,9 +4,12 @@ Procedural macros for reducing boilerplate in FTL tool components written in Rus
 
 ## Overview
 
-This crate provides two main macros:
-- `#[tool]` - Attribute macro for tool handler functions
-- `#[tool_component]` - Attribute macro for complete tool components
+This crate provides the `#[tool]` attribute macro for creating tool handler functions with minimal boilerplate. The macro:
+
+- Automatically derives JSON schemas from your input types (requires `JsonSchema` derive)
+- Supports both synchronous and asynchronous functions
+- Generates the complete HTTP handler with metadata
+- Handles all the boilerplate for you
 
 ## Usage
 
@@ -17,13 +20,15 @@ The `#[tool]` macro simplifies creating tool handlers:
 ```rust
 use ftl_sdk_macros::tool;
 use ftl_sdk::{ToolResponse, ToolContent};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use schemars::JsonSchema;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, JsonSchema)]
 struct EchoRequest {
     message: String,
 }
 
+/// Echoes back the input message
 #[tool]
 fn echo(req: EchoRequest) -> ToolResponse {
     ToolResponse {
@@ -37,42 +42,25 @@ fn echo(req: EchoRequest) -> ToolResponse {
 }
 ```
 
-### Complete Tool Component
+### Complete Example
 
-The `#[tool_component]` macro generates a complete HTTP handler with metadata:
+Here's a more complete example showing how the macro works with complex input types:
 
 ```rust
-use ftl_sdk_macros::tool_component;
-use ftl_sdk::{ToolMetadata, ToolResponse};
-use serde::{Deserialize, Serialize};
-use serde_json::json;
+use ftl_sdk_macros::tool;
+use ftl_sdk::ToolResponse;
+use serde::Deserialize;
+use schemars::JsonSchema;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, JsonSchema)]
 struct CalculatorRequest {
     operation: String,
     a: f64,
     b: f64,
 }
 
-#[tool_component(
-    metadata = ToolMetadata {
-        name: "calculator".to_string(),
-        title: Some("Calculator Tool".to_string()),
-        description: Some("Performs basic arithmetic operations".to_string()),
-        input_schema: json!({
-            "type": "object",
-            "properties": {
-                "operation": { "type": "string", "enum": ["add", "subtract", "multiply", "divide"] },
-                "a": { "type": "number" },
-                "b": { "type": "number" }
-            },
-            "required": ["operation", "a", "b"]
-        }),
-        output_schema: None,
-        annotations: None,
-        _meta: None,
-    }
-)]
+/// Performs basic arithmetic operations  
+#[tool]
 fn calculator(req: CalculatorRequest) -> ToolResponse {
     let result = match req.operation.as_str() {
         "add" => req.a + req.b,
@@ -95,11 +83,12 @@ fn calculator(req: CalculatorRequest) -> ToolResponse {
 
 ## Generated Code
 
-The `#[tool_component]` macro generates:
-- A `handle_request` function that returns metadata on GET and executes the handler on POST
+The `#[tool]` macro generates:
+- A `handle_tool_component` async function that returns metadata on GET and executes the handler on POST
 - Automatic JSON deserialization of request bodies
 - Error handling with proper HTTP status codes
 - Correct Content-Type headers
+- Full Spin HTTP component integration
 
 ## Important: Input Validation
 
@@ -121,31 +110,80 @@ Just like with the TypeScript SDK, **tools should NOT validate inputs themselves
 
 ## Example with Spin
 
-```rust
-use ftl_sdk_macros::tool_component;
-use ftl_sdk::{ToolMetadata, ToolResponse};
-use serde::Deserialize;
-use spin_sdk::http::{Request, Response};
+The `#[tool]` macro automatically generates the Spin HTTP component handler:
 
-#[derive(Deserialize)]
+```rust
+use ftl_sdk_macros::tool;
+use ftl_sdk::ToolResponse;
+use serde::Deserialize;
+use schemars::JsonSchema;
+
+#[derive(Deserialize, JsonSchema)]
 struct MyInput {
     value: String,
 }
 
-#[tool_component(
-    metadata = ToolMetadata {
-        name: "my-tool".to_string(),
-        // ... metadata fields
-    }
-)]
+/// Processes the input value
+#[tool]
 fn my_tool(input: MyInput) -> ToolResponse {
     ToolResponse::text(&format!("Processed: {}", input.value))
 }
 
-#[spin_sdk::http_component]
-fn handle_request(req: Request) -> Response {
-    // The macro generates handle_request for you!
-    handle_request(req)
+// That's it! The macro generates the HTTP handler for you.
+// No need to write any additional code.
+```
+
+## Async Support
+
+The `#[tool]` macro automatically detects whether your function is async and generates the appropriate code:
+
+```rust
+use ftl_sdk_macros::tool;
+use ftl_sdk::ToolResponse;
+use serde::Deserialize;
+use schemars::JsonSchema;
+use spin_sdk::http::{send, Method, Request, Response};
+
+#[derive(Deserialize, JsonSchema)]
+struct WeatherInput {
+    location: String,
+}
+
+/// Get weather for a location (async example)
+#[tool]
+async fn get_weather(input: WeatherInput) -> ToolResponse {
+    // Make async HTTP requests
+    let req = Request::builder()
+        .method(Method::Get)
+        .uri(format!("https://api.example.com/weather?location={}", input.location))
+        .build();
+    
+    match send(req).await {
+        Ok(res) => {
+            // Process response...
+            ToolResponse::text("Weather data here")
+        }
+        Err(e) => ToolResponse::error(format!("Failed to fetch weather: {}", e))
+    }
+}
+```
+
+## Custom Schemas (Advanced)
+
+While the macro automatically derives schemas from your types, you can still provide a custom schema if needed:
+
+```rust
+#[tool(
+    input_schema = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "custom": { "type": "string" }
+        }
+    })
+)]
+fn advanced_tool(input: MyInput) -> ToolResponse {
+    // Custom schema handling
+    ToolResponse::text("Processed")
 }
 ```
 

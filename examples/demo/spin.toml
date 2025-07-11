@@ -7,7 +7,7 @@ authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
 description = "MCP gateway with tool components"
 
 [variables]
-tool_components = { default = "echo-rs,echo-ts,calculator-ts" }
+tool_components = { default = "echo-rs,echo-ts,calculator-ts,weather-ts,weather-rs" }
 
 [[trigger.http]]
 route = "/mcp"
@@ -54,3 +54,27 @@ allowed_outbound_hosts = []
 [component.calculator-ts.build]
 command = "npm install && npm run build"
 workdir = "calculator-ts"
+
+[[trigger.http]]
+route = "/test/weather-ts"
+component = "weather-ts"
+
+[component.weather-ts]
+source = "weather-ts/dist/weather-ts.wasm"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+
+[component.weather-ts.build]
+command = "npm install && npm run build"
+workdir = "weather-ts"
+
+[[trigger.http]]
+route = "/test/weather-rs"
+component = "weather-rs"
+
+[component.weather-rs]
+source = "weather-rs/target/wasm32-wasip1/release/weather_rs.wasm"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+[component.weather-rs.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "weather-rs"
+watch = ["src/**/*.rs", "Cargo.toml"]

@@ -2,169 +2,6 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, FnArg, ItemFn, ReturnType};
 
-/// A procedural macro that transforms a simple function into a Spin HTTP component
-/// that serves as an MCP tool.
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_sdk::{ToolMetadata, ToolResponse};
-/// use ftl_sdk_macros::tool_component;
-/// use serde::Deserialize;
-/// use serde_json::json;
-///
-/// #[derive(Deserialize)]
-/// struct EchoRequest {
-///     message: String,
-/// }
-///
-/// #[tool_component(
-///     metadata = ToolMetadata {
-///         name: "echo".to_string(),
-///         title: Some("Echo Tool".to_string()),
-///         description: Some("Echoes back the input message".to_string()),
-///         input_schema: json!({
-///             "type": "object",
-///             "properties": {
-///                 "message": { "type": "string" }
-///             },
-///             "required": ["message"]
-///         }),
-///         output_schema: None,
-///         annotations: None,
-///         meta: None,
-///     }
-/// )]
-/// fn echo(req: EchoRequest) -> ToolResponse {
-///     ToolResponse::text(format!("Echo: {}", req.message))
-/// }
-/// ```
-///
-/// This will generate the necessary boilerplate to handle HTTP requests:
-/// - GET requests return the tool metadata
-/// - POST requests deserialize the body and call your function
-#[proc_macro_attribute]
-pub fn tool_component(args: TokenStream, input: TokenStream) -> TokenStream {
-    let input_fn = parse_macro_input!(input as ItemFn);
-    
-    // Parse the metadata argument
-    let args = proc_macro2::TokenStream::from(args);
-    
-    // Extract function details
-    let fn_name = &input_fn.sig.ident;
-    let fn_visibility = &input_fn.vis;
-    
-    // Get the input type from the function argument
-    let input_type = match input_fn.sig.inputs.first() {
-        Some(FnArg::Typed(pat_type)) => &pat_type.ty,
-        _ => {
-            return syn::Error::new_spanned(
-                &input_fn.sig,
-                "Function must have exactly one argument"
-            )
-            .to_compile_error()
-            .into();
-        }
-    };
-    
-    // Ensure the function returns ToolResponse
-    match &input_fn.sig.output {
-        ReturnType::Type(_, ty) => {
-            let ty_str = quote!(#ty).to_string();
-            if !ty_str.contains("ToolResponse") {
-                return syn::Error::new_spanned(
-                    &input_fn.sig.output,
-                    "Function must return ToolResponse"
-                )
-                .to_compile_error()
-                .into();
-            }
-        }
-        ReturnType::Default => {
-            return syn::Error::new_spanned(
-                &input_fn.sig,
-                "Function must return ToolResponse"
-            )
-            .to_compile_error()
-            .into();
-        }
-    }
-    
-    // Generate the HTTP handler
-    let output = quote! {
-        #input_fn
-        
-        #[::spin_sdk::http_component]
-        #fn_visibility fn handle_tool_component(req: ::spin_sdk::http::Request) -> ::spin_sdk::http::Response {
-            use ::spin_sdk::http::{Method, Response};
-            
-            // Define metadata
-            let metadata = {
-                #args
-            };
-            
-            match req.method() {
-                &Method::Get => {
-                    // Return tool metadata
-                    match ::serde_json::to_vec(&metadata) {
-                        Ok(body) => Response::builder()
-                            .status(200)
-                            .header("Content-Type", "application/json")
-                            .body(body)
-                            .build(),
-                        Err(e) => Response::builder()
-                            .status(500)
-                            .body(format!("Failed to serialize metadata: {}", e))
-                            .build()
-                    }
-                }
-                &Method::Post => {
-                    // Parse request body and execute tool
-                    let body = req.body();
-                    match ::serde_json::from_slice::<#input_type>(body) {
-                        Ok(input) => {
-                            let response = #fn_name(input);
-                            match ::serde_json::to_vec(&response) {
-                                Ok(body) => Response::builder()
-                                    .status(200)
-                                    .header("Content-Type", "application/json")
-                                    .body(body)
-                                    .build(),
-                                Err(e) => {
-                                    let error_response = ::ftl_sdk::ToolResponse::error(
-                                        format!("Failed to serialize response: {}", e)
-                                    );
-                                    Response::builder()
-                                        .status(500)
-                                        .header("Content-Type", "application/json")
-                                        .body(::serde_json::to_vec(&error_response).unwrap_or_default())
-                                        .build()
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            let error_response = ::ftl_sdk::ToolResponse::error(
-                                format!("Invalid request body: {}", e)
-                            );
-                            Response::builder()
-                                .status(400)
-                                .header("Content-Type", "application/json")
-                                .body(::serde_json::to_vec(&error_response).unwrap_or_default())
-                                .build()
-                        }
-                    }
-                }
-                _ => Response::builder()
-                    .status(405)
-                    .header("Allow", "GET, POST")
-                    .body("Method not allowed")
-                    .build()
-            }
-        }
-    };
-    
-    output.into()
-}
 
 /// A simpler version of tool_component that builds metadata from attributes
 ///
@@ -228,6 +65,7 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
     
     let fn_name = &input_fn.sig.ident;
     let fn_visibility = &input_fn.vis;
+    let is_async = input_fn.sig.asyncness.is_some();
     
     // Extract doc comments from the function
     let doc_comment = extract_doc_comment(&input_fn.attrs);
@@ -249,15 +87,27 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
                 quote!(None)
             }
         });
-    let input_schema = args_parsed.input_schema;
+    // Generate input schema - either from provided value or derive from type
+    let input_schema = match args_parsed.input_schema {
+        Some(schema) => schema,
+        None => {
+            // Automatically derive schema from the input type
+            quote!(::serde_json::to_value(::schemars::schema_for!(#input_type)).unwrap())
+        }
+    };
     
-    // For now, we'll use a generic object schema
-    // In a more advanced version, we could derive this from the input type
+    // Generate the function call with or without await
+    let fn_call = if is_async {
+        quote!(#fn_name(input).await)
+    } else {
+        quote!(#fn_name(input))
+    };
+    
     let output = quote! {
         #input_fn
         
         #[::spin_sdk::http_component]
-        #fn_visibility fn handle_tool_component(req: ::spin_sdk::http::Request) -> ::spin_sdk::http::Response {
+        #fn_visibility async fn handle_tool_component(req: ::spin_sdk::http::Request) -> ::spin_sdk::http::Response {
             use ::spin_sdk::http::{Method, Response};
             
             // Build metadata
@@ -291,7 +141,7 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
                     let body = req.body();
                     match ::serde_json::from_slice::<#input_type>(body) {
                         Ok(input) => {
-                            let response = #fn_name(input);
+                            let response = #fn_call;
                             match ::serde_json::to_vec(&response) {
                                 Ok(body) => Response::builder()
                                     .status(200)
@@ -339,7 +189,7 @@ struct ToolArgs {
     name: Option<String>,
     title: Option<String>,
     description: Option<String>,
-    input_schema: proc_macro2::TokenStream,
+    input_schema: Option<proc_macro2::TokenStream>,
 }
 
 // Extract the first line of doc comments from attributes
@@ -421,9 +271,7 @@ impl syn::parse::Parse for ToolArgs {
             }
         }
         
-        let input_schema = input_schema.ok_or_else(|| {
-            syn::Error::new(input.span(), "Missing required attribute: input_schema")
-        })?;
+        // input_schema is now optional
         
         Ok(ToolArgs {
             name,
