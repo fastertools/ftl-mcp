@@ -6,22 +6,9 @@
 
 A WebAssembly-based implementation of the Model Context Protocol (MCP) for building secure, fast, deployable AI tools in any language.
 
-## Overview
+## Why?
 
-`ftl-mcp` enables you to build MCP servers that run as WebAssembly components on the wasmtime-based Spin framework. FTL toolkits can be deployed to globally distributed Akamai edge functions via Fermyon. Each tool is isolated in its own sandbox with capability-based permissions, providing a secure execution environment for AI model interactions.
-
-## Architecture
-
-```
-MCP Client → Auth Gateway → MCP Gateway → [Tool Components]
-```
-
-### Components
-
-- **Auth Gateway**: Optional JWT authentication layer using WorkOS AuthKit
-- **MCP Gateway**: Routes JSON-RPC requests to appropriate tool components and validates tool call arguments
-- **Tool Components**: Individual WebAssembly modules implementing specific functionality
-- **SDKs**: TypeScript and Rust libraries for building tools
+`ftl-mcp` enables you to build MCP servers that run as WebAssembly components on the wasmtime-based Spin framework. FTL toolkits can be deployed to extremely fast, globally distributed Akamai edge workers via Fermyon. Each tool is isolated in its own sandbox with capability-based permissions, providing a secure execution environment for each tool call.
 
 ## Quick Start
 
@@ -76,7 +63,20 @@ addEventListener('fetch', (event: FetchEvent) => {
 ```
 </details>
 
-### Deployment
+## Architecture
+
+```
+MCP Client → Auth Gateway → MCP Gateway → [Tool Components]
+```
+
+### Components
+
+- **Auth Gateway**: Optional JWT authentication layer using WorkOS AuthKit
+- **MCP Gateway**: Routes JSON-RPC requests to appropriate tool components and validates tool call arguments
+- **Tool Components**: Individual WebAssembly modules implementing specific functionality
+- **SDKs**: TypeScript and Rust libraries for building tools
+
+### Run and use MCP tools
 
 1. Configure your tools in `spin.toml`:
 ```toml
