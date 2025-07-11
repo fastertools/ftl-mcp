@@ -28,7 +28,27 @@ MCP Client → Auth Gateway → MCP Gateway → [Tool Components]
 ### Writing a Tool
 
 <details>
-<summary><strong>TypeScript Example</strong></summary>
+<summary><strong>🦀 Rust Example</strong></summary>
+
+```rust
+use ftl_sdk::{tool, ToolResponse};
+use serde::Deserialize;
+use schemars::JsonSchema;
+
+#[derive(Deserialize, JsonSchema)]
+struct EchoInput {
+    message: String
+}
+
+#[tool]
+fn echo(input: EchoInput) -> ToolResponse {
+    ToolResponse::text(format!("Echo: {}", input.message))
+}
+```
+</details>
+
+<details>
+<summary><strong>🟦 TypeScript Example</strong></summary>
 
 ```typescript
 import { createTool, ToolResponse } from 'ftl-sdk'
@@ -53,26 +73,6 @@ const handle = createTool<z.infer<typeof InputSchema>>({
 addEventListener('fetch', (event: FetchEvent) => {
   event.respondWith(handle(event.request))
 })
-```
-</details>
-
-<details>
-<summary><strong>Rust Example</strong></summary>
-
-```rust
-use ftl_sdk::{tool, ToolResponse};
-use serde::Deserialize;
-use schemars::JsonSchema;
-
-#[derive(Deserialize, JsonSchema)]
-struct EchoInput {
-    message: String
-}
-
-#[tool]
-fn echo(input: EchoInput) -> ToolResponse {
-    ToolResponse::text(format!("Echo: {}", input.message))
-}
 ```
 </details>
 
