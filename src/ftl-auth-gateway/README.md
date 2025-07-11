@@ -1,10 +1,10 @@
 # FTL Auth Gateway
 
-An authentication gateway spin component for FTL MCP servers that integrates with WorkOS AuthKit to provide secure OAuth 2.0 authentication with JWT verification.
+JWT authentication gateway for MCP servers using WorkOS AuthKit.
 
 ## Overview
 
-The FTL Auth Gateway acts as a security layer that sits in front of the FTL MCP Gateway, ensuring that all MCP requests are properly authenticated before being forwarded to the actual MCP server. This gateway implements the full OAuth 2.0 Protected Resource specification with proper JWT signature verification.
+The Auth Gateway provides OAuth 2.0 authentication for MCP endpoints by validating JWT tokens and injecting user context into requests. It implements the OAuth 2.0 Protected Resource specification with cryptographic JWT verification.
 
 ```
 MCP Client → FTL Auth Gateway → FTL MCP Gateway → Tool Components

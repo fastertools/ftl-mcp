@@ -1,22 +1,19 @@
 # ftl-sdk (TypeScript)
 
-A minimal SDK providing MCP (Model Context Protocol) types and helpers for building FTL tool components.
+TypeScript SDK for building Model Context Protocol (MCP) tools that compile to WebAssembly.
 
 ## Installation
 
 ```bash
 npm install ftl-sdk
-# or
-yarn add ftl-sdk
-# or
-pnpm add ftl-sdk
 ```
 
 ## Overview
 
 This SDK provides:
 - TypeScript type definitions for the MCP protocol
-- Zero-dependency helper functions for creating tool components
+- Zero-dependency `createTool` helper for building tools
+- Seamless integration with Zod v4 for schema validation
 - Full compatibility with Spin WebAssembly components
 
 ## Quick Start
@@ -96,14 +93,33 @@ router
 export default router;
 ```
 
+## Building to WebAssembly
+
+Tools must be compiled to WebAssembly to run on the Spin platform:
+
+```json
+{
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --outfile=build/bundle.js --format=esm --platform=browser --external:node:* && j2w -i build/bundle.js -o dist/my-tool.wasm"
+  },
+  "devDependencies": {
+    "@spinframework/build-tools": "^1.0.1"
+  }
+}
+```
+
+The build process:
+1. Bundle TypeScript to ESM format using esbuild
+2. Convert JavaScript to WebAssembly using `j2w` (js-to-wasm)
+
 ## Using with Zod
 
-The SDK is designed to work seamlessly with Zod v4's native JSON Schema conversion:
+The SDK integrates with Zod v4's native JSON Schema conversion:
 
 ```typescript
 import { z } from 'zod'
 
-// Complex schema with refinements
+// Define schema with validation rules
 const CalculatorSchema = z.object({
   operation: z.enum(['add', 'subtract', 'multiply', 'divide']),
   a: z.number(),
@@ -113,7 +129,7 @@ const CalculatorSchema = z.object({
   { message: "Cannot divide by zero" }
 )
 
-// Convert to JSON Schema - all validation rules are preserved!
+// Convert to JSON Schema - validation rules are preserved
 const jsonSchema = z.toJSONSchema(CalculatorSchema)
 
 // Use with createTool
@@ -123,8 +139,13 @@ const handle = createTool<z.infer<typeof CalculatorSchema>>({
     inputSchema: jsonSchema as Record<string, unknown>
   },
   handler: async (input) => {
-    // input is fully typed and validated!
-    return ToolResponse.text(`Result: ${input.a + input.b}`)
+    // input is fully typed and validated by the gateway
+    switch (input.operation) {
+      case 'add': return ToolResponse.text(`Result: ${input.a + input.b}`)
+      case 'subtract': return ToolResponse.text(`Result: ${input.a - input.b}`)
+      case 'multiply': return ToolResponse.text(`Result: ${input.a * input.b}`)
+      case 'divide': return ToolResponse.text(`Result: ${input.a / input.b}`)
+    }
   }
 })
 ```
