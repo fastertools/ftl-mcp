@@ -71,9 +71,9 @@ MCP Client → Auth Gateway → MCP Gateway → [Tool Components]
 
 ### Components
 
-- **Auth Gateway**: Optional JWT authentication layer using WorkOS AuthKit
-- **MCP Gateway**: Routes JSON-RPC requests to appropriate tool components and validates tool call arguments
-- **Tool Components**: Individual WebAssembly modules implementing specific functionality
+- **Auth Gateway**: MCP-compatible authentication layer using WorkOS AuthKit
+- **MCP Gateway**: Implements the MCP protocol, routes requests to the appropriate tool component, and validates tool call arguments
+- **Tool Components**: Individual WebAssembly components implementing specific functionality as MCP tools
 - **SDKs**: TypeScript and Rust libraries for building tools
 
 ### Run and use MCP tools
