@@ -11,6 +11,12 @@ use crate::mcp_types::{
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GatewayConfig {
     pub server_info: ServerInfo,
+    #[serde(default = "default_validate_arguments")]
+    pub validate_arguments: bool,
+}
+
+fn default_validate_arguments() -> bool {
+    true
 }
 
 pub struct McpGateway {
@@ -25,6 +31,75 @@ impl McpGateway {
     /// Convert `snake_case` to kebab-case for component names
     fn snake_to_kebab(name: &str) -> String {
         name.replace('_', "-")
+    }
+
+    /// Fetch metadata for a specific tool
+    async fn fetch_tool_metadata(&self, tool_name: &str) -> Option<ToolMetadata> {
+        let component_name = Self::snake_to_kebab(tool_name);
+        let tool_url = format!("http://{component_name}.spin.internal/");
+
+        let req = Request::builder()
+            .method(Method::Get)
+            .uri(&tool_url)
+            .build();
+
+        match spin_sdk::http::send::<_, spin_sdk::http::Response>(req).await {
+            Ok(resp) => {
+                if *resp.status() == 200 {
+                    match serde_json::from_slice::<ToolMetadata>(resp.body()) {
+                        Ok(tool) => Some(tool),
+                        Err(e) => {
+                            eprintln!("Failed to parse metadata from tool '{tool_name}': {e}");
+                            None
+                        }
+                    }
+                } else {
+                    eprintln!(
+                        "Tool '{}' returned status {} for metadata request",
+                        tool_name,
+                        resp.status()
+                    );
+                    None
+                }
+            }
+            Err(e) => {
+                eprintln!("Failed to fetch metadata from tool '{tool_name}': {e}");
+                None
+            }
+        }
+    }
+
+    /// Validate tool arguments against the tool's input schema
+    fn validate_arguments(
+        tool_name: &str,
+        schema: &serde_json::Value,
+        arguments: &serde_json::Value,
+    ) -> Result<(), String> {
+        match jsonschema::validator_for(schema) {
+            Ok(validator) => {
+                // Use iter_errors which returns an iterator
+                let errors: Vec<jsonschema::ValidationError<'_>> =
+                    validator.iter_errors(arguments).collect();
+                if errors.is_empty() {
+                    Ok(())
+                } else {
+                    let error_messages: Vec<String> = errors
+                        .iter()
+                        .map(|error| {
+                            format!("Validation error at {}: {}", error.instance_path, error)
+                        })
+                        .collect();
+                    Err(format!(
+                        "Invalid arguments for tool '{}': {}",
+                        tool_name,
+                        error_messages.join("; ")
+                    ))
+                }
+            }
+            Err(e) => Err(format!(
+                "Failed to compile schema for tool '{tool_name}': {e}"
+            )),
+        }
     }
 
     pub async fn handle_request(&self, request: JsonRpcRequest) -> Option<JsonRpcResponse> {
@@ -115,43 +190,18 @@ impl McpGateway {
 
         // Parse the comma-separated list of tool names
         let tool_names: Vec<&str> = tool_components.split(',').map(str::trim).collect();
-        let mut tools = Vec::new();
 
-        // Fetch metadata from each tool component
-        for tool_name in tool_names {
-            // Convert snake_case to kebab-case for component names
-            let component_name = Self::snake_to_kebab(tool_name);
-            let tool_url = format!("http://{component_name}.spin.internal/");
+        // Create futures for fetching metadata from all tools in parallel
+        let metadata_futures: Vec<_> = tool_names
+            .iter()
+            .map(|tool_name| self.fetch_tool_metadata(tool_name))
+            .collect();
 
-            let req = Request::builder()
-                .method(Method::Get)
-                .uri(&tool_url)
-                .build();
+        // Execute all futures concurrently and collect results
+        let results = futures::future::join_all(metadata_futures).await;
 
-            match spin_sdk::http::send::<_, spin_sdk::http::Response>(req).await {
-                Ok(resp) => {
-                    if *resp.status() == 200 {
-                        match serde_json::from_slice::<ToolMetadata>(resp.body()) {
-                            Ok(tool) => tools.push(tool),
-                            Err(e) => {
-                                eprintln!("Failed to parse metadata from tool '{tool_name}': {e}");
-                                // Continue with other tools even if one fails
-                            }
-                        }
-                    } else {
-                        eprintln!(
-                            "Tool '{}' returned status {} for metadata request",
-                            tool_name,
-                            resp.status()
-                        );
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Failed to fetch metadata from tool '{tool_name}': {e}");
-                    // Continue with other tools even if one fails
-                }
-            }
-        }
+        // Filter out None values and collect successful tool metadata
+        let tools: Vec<ToolMetadata> = results.into_iter().flatten().collect();
 
         let response = ListToolsResponse { tools };
         match serde_json::to_value(response) {
@@ -185,13 +235,41 @@ impl McpGateway {
             }
         };
 
+        // Validate arguments if validation is enabled
+        let tool_arguments = params.arguments.unwrap_or_else(|| serde_json::json!({}));
+
+        if self.config.validate_arguments {
+            // Fetch tool metadata for validation
+            if let Some(tool_metadata) = self.fetch_tool_metadata(&params.name).await {
+                // Validate arguments against the tool's input schema
+                if let Err(validation_error) = Self::validate_arguments(
+                    &params.name,
+                    &tool_metadata.input_schema,
+                    &tool_arguments,
+                ) {
+                    return JsonRpcResponse::error(
+                        request.id,
+                        ErrorCode::INVALID_PARAMS.0,
+                        &validation_error,
+                    );
+                }
+            } else {
+                // Tool metadata not available - log but continue
+                // This allows the tool itself to handle validation
+                eprintln!(
+                    "Warning: Could not fetch metadata for tool '{}', skipping validation",
+                    params.name
+                );
+            }
+        }
+
         // Call the specific tool component
         // Convert snake_case to kebab-case for component names
         let component_name = Self::snake_to_kebab(&params.name);
         let tool_url = format!("http://{component_name}.spin.internal/");
 
         // Prepare the request body with just the arguments
-        let tool_request_body = params.arguments.unwrap_or_else(|| serde_json::json!({}));
+        let tool_request_body = tool_arguments;
 
         let req = Request::builder()
             .method(Method::Post)
@@ -300,11 +378,17 @@ pub async fn handle_mcp_request(req: Request) -> Response {
     };
 
     // Create gateway with config
+    let validate_arguments = variables::get("validate_arguments")
+        .unwrap_or_else(|_| "true".to_string())
+        .parse::<bool>()
+        .unwrap_or(true);
+
     let config = GatewayConfig {
         server_info: ServerInfo {
-            name: "mcp-gateway".to_string(),
-            version: "0.1.0".to_string(),
+            name: "ftl-mcp-gateway".to_string(),
+            version: "0.0.3".to_string(),
         },
+        validate_arguments,
     };
     let gateway = McpGateway::new(config);
 
