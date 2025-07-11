@@ -1,0 +1,83 @@
+[package]
+name = "ftl-auth-gateway"
+authors = ["FTL Contributors"]
+description = "Authentication gateway for FTL MCP servers using AuthKit"
+version = "0.0.1"
+license = "Apache-2.0"
+rust-version = "1.70"
+edition = "2021"
+repository = "https://github.com/fastertools/ftl-mcp"
+readme = "README.md"
+keywords = ["mcp", "gateway", "auth", "authkit", "webassembly"]
+categories = ["web-programming", "wasm", "authentication"]
+
+[lib]
+name = "ftl_auth_gateway"
+crate-type = ["cdylib"]
+
+[dependencies]
+anyhow = "1"
+spin-sdk = "3.1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.22"
+jsonwebtoken = "9.3"
+# For JWKS fetching - using reqwest with minimal features for WASM
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# For caching JWKS
+once_cell = "1.21"
+tokio = { version = "1", features = ["sync"] }
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Lint groups with lower priority
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+complexity = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+
+# Deny specific dangerous patterns
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unimplemented = "deny"
+todo = "deny"
+unreachable = "deny"
+mem_forget = "deny"
+cast_possible_truncation = "deny"
+cast_possible_wrap = "deny"
+cast_precision_loss = "deny"
+cast_sign_loss = "deny"
+indexing_slicing = "deny"
+unwrap_in_result = "deny"
+
+# Security and correctness
+enum_glob_use = "deny"
+exit = "deny"
+wildcard_imports = "deny"
+
+# Allow some pedantic lints that don't make sense for this project
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+missing_inline_in_public_items = "allow"
+impl_trait_in_params = "allow"
+must_use_candidate = "allow"
+return_self_not_must_use = "allow"
+used_underscore_binding = "allow"
+wildcard_in_or_patterns = "allow"
+redundant_pub_crate = "allow"
+missing_const_for_fn = "allow"
+exhaustive_structs = "allow"
+exhaustive_enums = "allow"
+future_not_send = "allow"
+multiple_crate_versions = "allow"
+
+[workspace]
