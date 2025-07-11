@@ -5,6 +5,7 @@ use spin_sdk::http::{Request, Response};
 use crate::auth::{AuthKitConfig, Claims};
 
 /// Forward authenticated requests to the MCP gateway
+#[allow(clippy::too_many_lines)]
 pub async fn forward_to_mcp_gateway(
     req: Request,
     config: &AuthKitConfig,
@@ -21,9 +22,10 @@ pub async fn forward_to_mcp_gateway(
         match serde_json::from_slice(body) {
             Ok(data) => data,
             Err(e) => {
-                eprintln!("Failed to parse request body as JSON: {}", e);
-                eprintln!("Request body: {:?}", String::from_utf8_lossy(body));
-                return Err(anyhow::anyhow!("Invalid JSON in request body: {}", e));
+                eprintln!("Failed to parse request body as JSON: {e}");
+                let body_str = String::from_utf8_lossy(body);
+                eprintln!("Request body: {body_str:?}");
+                return Err(anyhow::anyhow!("Invalid JSON in request body: {e}"));
             }
         }
     };
@@ -49,8 +51,9 @@ pub async fn forward_to_mcp_gateway(
     }
 
     // Build the request to forward to MCP gateway
-    eprintln!("Forwarding request to: {}", &config.mcp_gateway_url);
-    
+    let mcp_url = &config.mcp_gateway_url;
+    eprintln!("Forwarding request to: {mcp_url}");
+
     // Determine the body to forward
     let forward_body = if body.is_empty() {
         // Forward empty body as-is
@@ -61,10 +64,13 @@ pub async fn forward_to_mcp_gateway(
         body.to_vec()
     } else {
         // Forward modified JSON
-        eprintln!("Request data: {}", serde_json::to_string_pretty(&request_data)?);
+        eprintln!(
+            "Request data: {}",
+            serde_json::to_string_pretty(&request_data)?
+        );
         serde_json::to_vec(&request_data)?
     };
-    
+
     let forward_req = Request::builder()
         .method(req.method().clone())
         .uri(&config.mcp_gateway_url)
@@ -83,10 +89,14 @@ pub async fn forward_to_mcp_gateway(
         match serde_json::from_slice(resp_body) {
             Ok(data) => data,
             Err(e) => {
-                eprintln!("Failed to parse MCP gateway response as JSON: {}", e);
-                eprintln!("Response status: {}", resp.status());
-                eprintln!("Response body: {:?}", String::from_utf8_lossy(resp_body));
-                return Err(anyhow::anyhow!("Invalid JSON response from MCP gateway: {}", e));
+                eprintln!("Failed to parse MCP gateway response as JSON: {e}");
+                let status = resp.status();
+                eprintln!("Response status: {status}");
+                let body_str = String::from_utf8_lossy(resp_body);
+                eprintln!("Response body: {body_str:?}");
+                return Err(anyhow::anyhow!(
+                    "Invalid JSON response from MCP gateway: {e}"
+                ));
             }
         }
     };
@@ -129,3 +139,4 @@ pub async fn forward_to_mcp_gateway(
             .build())
     }
 }
+

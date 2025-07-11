@@ -7,7 +7,7 @@ mod jwks;
 mod metadata;
 mod proxy;
 
-use auth::{AuthKitConfig, verify_request};
+use auth::{verify_request, AuthKitConfig};
 use metadata::handle_metadata_request;
 use proxy::forward_to_mcp_gateway;
 
@@ -24,7 +24,7 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
             .unwrap_or_else(|| {
                 let issuer = variables::get("authkit_issuer")
                     .unwrap_or_else(|_| "https://example.authkit.app".to_string());
-                format!("{}/oauth2/jwks", issuer)
+                format!("{issuer}/oauth2/jwks")
             }),
         audience: variables::get("authkit_audience")
             .ok()
@@ -52,21 +52,36 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
                 .find(|(name, _)| name.eq_ignore_ascii_case("x-original-host"))
                 .and_then(|(_, value)| value.as_str())
         });
-    
+
     // Only log headers for metadata endpoints to reduce noise
-    if matches!(path, "/.well-known/oauth-protected-resource" | "/.well-known/oauth-authorization-server") {
-        eprintln!("=== Metadata request to {} ===", path);
-        eprintln!("Selected host: {:?}", host);
-        
+    if matches!(
+        path,
+        "/.well-known/oauth-protected-resource" | "/.well-known/oauth-authorization-server"
+    ) {
+        eprintln!("=== Metadata request to {path} ===");
+        eprintln!("Selected host: {host:?}");
+
         // Log specific headers we care about
-        if let Some((_, value)) = req.headers().find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-host")) {
-            eprintln!("X-Forwarded-Host: {:?}", value.as_str());
+        if let Some((_, value)) = req
+            .headers()
+            .find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-host"))
+        {
+            let val = value.as_str();
+            eprintln!("X-Forwarded-Host: {val:?}");
         }
-        if let Some((_, value)) = req.headers().find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-proto")) {
-            eprintln!("X-Forwarded-Proto: {:?}", value.as_str());
+        if let Some((_, value)) = req
+            .headers()
+            .find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-proto"))
+        {
+            let val = value.as_str();
+            eprintln!("X-Forwarded-Proto: {val:?}");
         }
-        if let Some((_, value)) = req.headers().find(|(name, _)| name.eq_ignore_ascii_case("host")) {
-            eprintln!("Host: {:?}", value.as_str());
+        if let Some((_, value)) = req
+            .headers()
+            .find(|(name, _)| name.eq_ignore_ascii_case("host"))
+        {
+            let val = value.as_str();
+            eprintln!("Host: {val:?}");
         }
     }
 
@@ -75,7 +90,7 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
         path,
         "/.well-known/oauth-protected-resource" | "/.well-known/oauth-authorization-server"
     ) {
-        return handle_metadata_request(path, &config, host, &req);
+        return Ok(handle_metadata_request(path, &config, host, &req));
     }
 
     // Handle OPTIONS requests (CORS preflight)
@@ -84,7 +99,10 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
             .status(204)
             .header("Access-Control-Allow-Origin", "*")
             .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-            .header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            .header(
+                "Access-Control-Allow-Headers",
+                "Content-Type, Authorization",
+            )
             .header("Access-Control-Max-Age", "86400")
             .build());
     }
@@ -97,10 +115,10 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
             match forward_to_mcp_gateway(req, &config, Some(claims)).await {
                 Ok(response) => Ok(response),
                 Err(e) => {
-                    eprintln!("Failed to forward request to MCP gateway: {}", e);
+                    eprintln!("Failed to forward request to MCP gateway: {e}");
                     Ok(Response::builder()
                         .status(502)
-                        .body(format!("Gateway error: {}", e))
+                        .body(format!("Gateway error: {e}"))
                         .build())
                 }
             }
@@ -111,3 +129,4 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
         }
     }
 }
+
