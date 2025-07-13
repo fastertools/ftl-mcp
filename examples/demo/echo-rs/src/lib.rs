@@ -3,13 +3,14 @@ use serde::Deserialize;
 use schemars::JsonSchema;
 
 #[derive(Deserialize, JsonSchema)]
-struct EchoInput {
-    /// The message to echo back to the caller, verbatim
-    message: String
+struct EchoRsInput {
+    /// The input message to process
+    message: String,
 }
 
-/// Echo the message back to the caller
+/// An MCP tool written in Rust
 #[tool]
-fn echo_rs(input: EchoInput) -> ToolResponse {
-    ToolResponse::text(format!("Echo: {}", input.message))
+fn echo_rs(input: EchoRsInput) -> ToolResponse {
+    // TODO: Implement your tool logic here
+    ToolResponse::text(format!("Processed: {}", input.message))
 }

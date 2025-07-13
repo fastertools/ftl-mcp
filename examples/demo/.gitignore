@@ -1,3 +1,6 @@
-main.wasm
 .spin/
-.spin-aka/
+target/
+node_modules/
+dist/
+build/
+*.wasm

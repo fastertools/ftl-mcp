@@ -1,13 +1,13 @@
 spin_manifest_version = 2
 
 [application]
-name = "gateway-demo"
-version = "0.0.1"
+name = "ftl-mcp-demo"
+version = "0.1.0"
 authors = ["bowlofarugula <bowlofarugula@gmail.com>"]
-description = "MCP gateway with tool components"
+description = "FTL MCP server for hosting MCP tools"
 
 [variables]
-tool_components = { default = "echo-rs,echo-ts,calculator-ts,weather-ts,weather-rs" }
+tool_components = { default = "echo-rs,echo-ts,weather-rs,weather-ts" }
 
 [[trigger.http]]
 route = "/mcp"
@@ -21,7 +21,7 @@ tool_components = "{{ tool_components }}"
 validate_arguments = "true"
 
 [[trigger.http]]
-route = "/test/echo-rs"
+route = "/echo-rs"
 component = "echo-rs"
 
 [component.echo-rs]
@@ -32,44 +32,28 @@ command = "cargo build --target wasm32-wasip1 --release"
 workdir = "echo-rs"
 watch = ["src/**/*.rs", "Cargo.toml"]
 
+# IMPORTANT: After adding this component, update the tool_components variable
+# in the [variables] section at the top of spin.toml to include "echo-rs"
+# Example: tool_components = { default = "existing-tool,echo-rs" }
+
 [[trigger.http]]
-route = "/test/echo-ts"
+route = "/echo-ts"
 component = "echo-ts"
 
 [component.echo-ts]
 source = "echo-ts/dist/echo-ts.wasm"
 allowed_outbound_hosts = []
-
 [component.echo-ts.build]
 command = "npm install && npm run build"
 workdir = "echo-ts"
+watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
+
+# IMPORTANT: After adding this component, update the tool_components variable
+# in the [variables] section at the top of spin.toml to include "echo-ts"
+# Example: tool_components = { default = "existing-tool,echo-ts" }
 
 [[trigger.http]]
-route = "/test/calculator-ts"
-component = "calculator-ts"
-
-[component.calculator-ts]
-source = "calculator-ts/dist/calculator-ts.wasm"
-allowed_outbound_hosts = []
-
-[component.calculator-ts.build]
-command = "npm install && npm run build"
-workdir = "calculator-ts"
-
-[[trigger.http]]
-route = "/test/weather-ts"
-component = "weather-ts"
-
-[component.weather-ts]
-source = "weather-ts/dist/weather-ts.wasm"
-allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
-
-[component.weather-ts.build]
-command = "npm install && npm run build"
-workdir = "weather-ts"
-
-[[trigger.http]]
-route = "/test/weather-rs"
+route = "/weather-rs"
 component = "weather-rs"
 
 [component.weather-rs]
@@ -79,3 +63,23 @@ allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.o
 command = "cargo build --target wasm32-wasip1 --release"
 workdir = "weather-rs"
 watch = ["src/**/*.rs", "Cargo.toml"]
+
+# IMPORTANT: After adding this component, update the tool_components variable
+# in the [variables] section at the top of spin.toml to include "weather-rs"
+# Example: tool_components = { default = "existing-tool,weather-rs" }
+
+[[trigger.http]]
+route = "/weather-ts"
+component = "weather-ts"
+
+[component.weather-ts]
+source = "weather-ts/dist/weather-ts.wasm"
+allowed_outbound_hosts = ["https://geocoding-api.open-meteo.com", "https://api.open-meteo.com"]
+[component.weather-ts.build]
+command = "npm install && npm run build"
+workdir = "weather-ts"
+watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
+
+# IMPORTANT: After adding this component, update the tool_components variable
+# in the [variables] section at the top of spin.toml to include "weather-ts"
+# Example: tool_components = { default = "existing-tool,weather-ts" }
