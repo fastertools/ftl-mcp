@@ -1,0 +1,15 @@
+[[trigger.http]]
+route = "/{{project-name | kebab_case}}"
+component = "{{project-name | kebab_case}}"
+
+[component.{{project-name | kebab_case}}]
+source = "{{project-name | kebab_case}}/target/wasm32-wasip1/release/{{project-name | snake_case}}.wasm"
+allowed_outbound_hosts = []
+[component.{{project-name | kebab_case}}.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "{{project-name | kebab_case}}"
+watch = ["src/**/*.rs", "Cargo.toml"]
+
+# IMPORTANT: After adding this component, update the tool_components variable
+# in the [variables] section at the top of spin.toml to include "{{project-name | kebab_case}}"
+# Example: tool_components = { default = "existing-tool,{{project-name | kebab_case}}" }

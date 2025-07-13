@@ -1,0 +1,21 @@
+spin_manifest_version = 2
+
+[application]
+name = "{{project-name | kebab_case}}"
+version = "0.1.0"
+authors = ["{{authors}}"]
+description = "{{project-description}}"
+
+[variables]
+tool_components = { default = "" }
+
+[[trigger.http]]
+route = "/mcp"
+component = "ftl-mcp-gateway"
+
+[component.ftl-mcp-gateway]
+source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.3" }
+allowed_outbound_hosts = ["http://*.spin.internal"]
+[component.ftl-mcp-gateway.variables]
+tool_components = "{% raw %}{{ tool_components }}{% endraw %}"
+validate_arguments = "true"
