@@ -1,6 +1,6 @@
 [package]
 name = "ftl-sdk"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 description = "Thin SDK providing MCP protocol types for FTL tool development"
 license = "Apache-2.0"
@@ -15,7 +15,7 @@ name = "ftl_sdk"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-ftl-sdk-macros = { version = "0.1.0", path = "../ftl-sdk-rs-macros", optional = true }
+ftl-sdk-macros = { version = "0.0.1", optional = true }
 
 [features]
 default = []
