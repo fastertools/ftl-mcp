@@ -122,7 +122,9 @@ dependencies = [
 
 [[package]]
 name = "ftl-sdk"
-version = "0.2.2"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0e159c294026ff4a5206f2f7191abe2ba4aae2d8a2b2d7cc98024acd8215ade6"
 dependencies = [
  "ftl-sdk-macros",
  "serde",
@@ -131,7 +133,9 @@ dependencies = [
 
 [[package]]
 name = "ftl-sdk-macros"
-version = "0.1.0"
+version = "0.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6f75c78501f46c631e0336cbf1385f02a843d8a2e635e67257e9a20c736fc21"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -520,9 +524,9 @@ dependencies = [
 
 [[package]]
 name = "spdx"
-version = "0.10.8"
+version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58b69356da67e2fc1f542c71ea7e654a361a79c938e4424392ecf4fa065d2193"
+checksum = "c3e17e880bafaeb362a7b751ec46bdc5b61445a188f80e0606e68167cd540fa3"
 dependencies = [
  "smallvec",
 ]
@@ -760,7 +764,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "weather-rs"
+name = "weather_rs"
 version = "0.1.0"
 dependencies = [
  "ftl-sdk",

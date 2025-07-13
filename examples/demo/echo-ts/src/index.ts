@@ -2,29 +2,27 @@ import { createTool, ToolResponse } from 'ftl-sdk'
 import { z } from 'zod'
 
 // Define the schema using Zod
-const EchoInputSchema = z.object({
-  message: z.string().describe('The message to echo back')
+const ToolSchema = z.object({
+  message: z.string().describe('The input message to process')
 })
 
 // Derive TypeScript type from the schema
-type EchoInput = z.infer<typeof EchoInputSchema>
+type ToolInput = z.infer<typeof ToolSchema>
 
-const echo = createTool<EchoInput>({
+const tool = createTool<ToolInput>({
   metadata: {
     name: 'echo_ts',
-    title: 'Simplified Echo Tool (TypeScript)',
-    description: 'A minimal echo tool using Zod for schema definition',
-    // Use Zod v4's native JSON Schema conversion
-    inputSchema: z.toJSONSchema(EchoInputSchema)
+    title: 'echo-ts',
+    description: 'An MCP tool written in TypeScript',
+    inputSchema: z.toJSONSchema(ToolSchema)
   },
   handler: async (input) => {
-    // Input is already validated by the gateway
-    // TypeScript knows that input.message is a string!
-    return ToolResponse.text(`Echo: ${input.message}`)
+    // TODO: Implement your tool logic here
+    return ToolResponse.text(`Processed: ${input.message}`)
   }
 })
 
 //@ts-ignore
 addEventListener('fetch', (event: FetchEvent) => {
-  event.respondWith(echo(event.request))
+  event.respondWith(tool(event.request))
 })
