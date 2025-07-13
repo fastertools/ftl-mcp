@@ -1,40 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, FnArg, ItemFn, ReturnType};
+use syn::{parse_macro_input, FnArg, ItemFn};
 
-
-/// A simpler version of tool_component that builds metadata from attributes
-///
-/// # Example
-///
-/// ```rust
-/// use ftl_sdk::ToolResponse;
-/// use ftl_sdk_macros::tool;
-/// use serde::Deserialize;
-/// use serde_json::json;
-///
-/// #[derive(Deserialize)]
-/// struct AddRequest {
-///     a: i32,
-///     b: i32,
-/// }
-///
-/// /// Adds two numbers together
-/// #[tool(
-///     input_schema = json!({
-///         "type": "object",
-///         "properties": {
-///             "a": { "type": "integer" },
-///             "b": { "type": "integer" }
-///         },
-///         "required": ["a", "b"]
-///     })
-/// )]
-/// fn add(req: AddRequest) -> ToolResponse {
-///     let result = req.a + req.b;
-///     ToolResponse::text(format!("{} + {} = {}", req.a, req.b, result))
-/// }
-/// ```
+/// Create a tool that can be used with the MCP Gateway.
 ///
 /// The macro will:
 /// - Use the function name as the tool name (unless overridden)
@@ -43,42 +11,44 @@ use syn::{parse_macro_input, FnArg, ItemFn, ReturnType};
 #[proc_macro_attribute]
 pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
     let input_fn = parse_macro_input!(input as ItemFn);
-    
+
     // Parse the arguments to extract name, title, description
     let args_parsed = match syn::parse::<ToolArgs>(args) {
         Ok(args) => args,
         Err(e) => return e.to_compile_error().into(),
     };
-    
+
     // Get the input type to derive the schema
     let input_type = match input_fn.sig.inputs.first() {
         Some(FnArg::Typed(pat_type)) => &pat_type.ty,
         _ => {
             return syn::Error::new_spanned(
                 &input_fn.sig,
-                "Function must have exactly one argument"
+                "Function must have exactly one argument",
             )
             .to_compile_error()
             .into();
         }
     };
-    
+
     let fn_name = &input_fn.sig.ident;
     let fn_visibility = &input_fn.vis;
     let is_async = input_fn.sig.asyncness.is_some();
-    
+
     // Extract doc comments from the function
     let doc_comment = extract_doc_comment(&input_fn.attrs);
-    
+
     // Use provided values or fall back to defaults
     let name = args_parsed.name.unwrap_or_else(|| fn_name.to_string());
-    let title = args_parsed.title
+    let title = args_parsed
+        .title
         .map(|s| quote!(Some(#s.to_string())))
         .unwrap_or_else(|| {
             let title = generate_title(&fn_name.to_string());
             quote!(Some(#title.to_string()))
         });
-    let description = args_parsed.description
+    let description = args_parsed
+        .description
         .map(|s| quote!(Some(#s.to_string())))
         .unwrap_or_else(|| {
             if let Some(doc) = doc_comment {
@@ -95,21 +65,21 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
             quote!(::serde_json::to_value(::schemars::schema_for!(#input_type)).unwrap())
         }
     };
-    
+
     // Generate the function call with or without await
     let fn_call = if is_async {
         quote!(#fn_name(input).await)
     } else {
         quote!(#fn_name(input))
     };
-    
+
     let output = quote! {
         #input_fn
-        
+
         #[::spin_sdk::http_component]
         #fn_visibility async fn handle_tool_component(req: ::spin_sdk::http::Request) -> ::spin_sdk::http::Response {
             use ::spin_sdk::http::{Method, Response};
-            
+
             // Build metadata
             let metadata = ::ftl_sdk::ToolMetadata {
                 name: #name.to_string(),
@@ -120,7 +90,7 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
                 annotations: None,
                 meta: None,
             };
-            
+
             match req.method() {
                 &Method::Get => {
                     // Return tool metadata
@@ -180,7 +150,7 @@ pub fn tool(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
     };
-    
+
     output.into()
 }
 
@@ -198,17 +168,14 @@ fn extract_doc_comment(attrs: &[syn::Attribute]) -> Option<String> {
         .iter()
         .filter_map(|attr| {
             if attr.path().is_ident("doc") {
-                match &attr.meta {
-                    syn::Meta::NameValue(nv) => {
-                        if let syn::Expr::Lit(lit) = &nv.value {
-                            if let syn::Lit::Str(s) = &lit.lit {
-                                let doc = s.value();
-                                // Trim leading space that rustdoc adds
-                                return Some(doc.trim_start_matches(' ').to_string());
-                            }
+                if let syn::Meta::NameValue(nv) = &attr.meta {
+                    if let syn::Expr::Lit(lit) = &nv.value {
+                        if let syn::Lit::Str(s) = &lit.lit {
+                            let doc = s.value();
+                            // Trim leading space that rustdoc adds
+                            return Some(doc.trim_start_matches(' ').to_string());
                         }
                     }
-                    _ => {}
                 }
             }
             None
@@ -236,11 +203,11 @@ impl syn::parse::Parse for ToolArgs {
         let mut title = None;
         let mut description = None;
         let mut input_schema = None;
-        
+
         while !input.is_empty() {
             let ident: syn::Ident = input.parse()?;
             input.parse::<syn::Token![=]>()?;
-            
+
             match ident.to_string().as_str() {
                 "name" => {
                     let lit: syn::LitStr = input.parse()?;
@@ -261,18 +228,18 @@ impl syn::parse::Parse for ToolArgs {
                 _ => {
                     return Err(syn::Error::new_spanned(
                         ident,
-                        "Unknown attribute. Expected: name, title, description, or input_schema"
+                        "Unknown attribute. Expected: name, title, description, or input_schema",
                     ));
                 }
             }
-            
+
             if !input.is_empty() {
                 input.parse::<syn::Token![,]>()?;
             }
         }
-        
+
         // input_schema is now optional
-        
+
         Ok(ToolArgs {
             name,
             title,
