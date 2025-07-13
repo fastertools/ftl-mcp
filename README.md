@@ -163,6 +163,25 @@ curl -X POST http://127.0.0.1:3000/mcp \
 - Automatic schema generation using schemars
 - Native async/await support
 
+## Getting Started with Templates
+
+Install the Spin templates:
+```bash
+spin templates install --dir .
+```
+
+Create a new MCP server:
+```bash
+spin new -t ftl-mcp-server my-server
+cd my-server
+spin add -t ftl-mcp-ts hello-tool
+spin add -t ftl-mcp-rust greet-tool
+# Update tool_components in spin.toml
+spin build --up
+```
+
+See the `templates/` directory for available templates and documentation.
+
 ## Examples
 
 See the `examples/demo` directory for complete examples:

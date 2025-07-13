@@ -1,0 +1,14 @@
+manifest_version = "1"
+id = "ftl-auth-gateway"
+description = "FTL Auth Gateway for MCP authentication with WorkOS AuthKit"
+tags = ["mcp", "http", "auth", "authkit", "gateway"]
+
+[parameters]
+authkit-issuer = { type = "string", prompt = "AuthKit issuer URL", default = "https://your-tenant.authkit.app" }
+authkit-audience = { type = "string", prompt = "AuthKit audience (leave empty for default)", default = "" }
+authkit-jwks-uri = { type = "string", prompt = "AuthKit JWKS URI (leave empty for default)", default = "" }
+
+[add_component]
+skip_files = ["spin.toml", "README.md", ".gitignore"]
+[add_component.snippets]
+component = "component.txt"

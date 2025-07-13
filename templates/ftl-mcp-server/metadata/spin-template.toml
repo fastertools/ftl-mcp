@@ -1,0 +1,7 @@
+manifest_version = "1"
+id = "ftl-mcp-server"
+description = "FTL MCP server with gateway for hosting MCP tools"
+tags = ["mcp", "http", "ftl", "gateway"]
+
+[parameters]
+project-description = { type = "string", prompt = "Description", default = "FTL MCP server for hosting MCP tools" }

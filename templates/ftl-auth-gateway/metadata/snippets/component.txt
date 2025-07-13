@@ -1,0 +1,25 @@
+# IMPORTANT: This snippet modifies the existing MCP gateway configuration
+# The auth gateway will handle /mcp and forward to /mcp-internal
+
+# First, update the existing ftl-mcp-gateway to use /mcp-internal
+# You'll need to manually update the existing [[trigger.http]] section for ftl-mcp-gateway:
+# Change: route = "/mcp"
+# To:     route = "/mcp-internal"
+
+# Add auth gateway configuration
+[[trigger.http]]
+route = "/mcp"
+component = "ftl-auth-gateway"
+
+[[trigger.http]]
+route = "/.well-known/..."
+component = "ftl-auth-gateway"
+
+[component.ftl-auth-gateway]
+source = { registry = "ghcr.io", package = "fastertools:ftl-auth-gateway", version = "0.0.1" }
+allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app", "{{authkit-issuer}}"]
+[component.ftl-auth-gateway.variables]
+authkit_issuer = "{{authkit-issuer}}"
+authkit_audience = "{{authkit-audience}}"
+authkit_jwks_uri = "{{authkit-jwks-uri}}"
+mcp_gateway_url = "http://ftl-mcp-gateway.spin.internal/mcp-internal"
