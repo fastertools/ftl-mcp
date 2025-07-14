@@ -2,7 +2,7 @@
 name = "ftl-auth-gateway"
 authors = ["FTL Contributors"]
 description = "Authentication gateway for FTL MCP servers using AuthKit"
-version = "0.0.1"
+version = "0.0.2"
 license = "Apache-2.0"
 rust-version = "1.70"
 edition = "2021"
@@ -27,6 +27,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 # For caching JWKS
 once_cell = "1.21"
 tokio = { version = "1", features = ["sync"] }
+# For error handling
+thiserror = "1.0"
 
 [lints.rust]
 unsafe_code = "forbid"
@@ -81,3 +83,4 @@ future_not_send = "allow"
 multiple_crate_versions = "allow"
 
 [workspace]
+members = ["tests"]

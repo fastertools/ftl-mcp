@@ -2,14 +2,18 @@ use anyhow::Result;
 use serde_json::Value;
 use spin_sdk::http::{Request, Response};
 
-use crate::auth::{AuthKitConfig, Claims};
+use crate::{
+    auth::{AuthConfig, Claims},
+    providers::UserContext,
+};
 
 /// Forward authenticated requests to the MCP gateway
 #[allow(clippy::too_many_lines)]
 pub async fn forward_to_mcp_gateway(
     req: Request,
-    config: &AuthKitConfig,
-    claims: Option<Claims>,
+    config: &AuthConfig,
+    auth_context: Option<(Claims, UserContext)>,
+    trace_id: &str,
 ) -> Result<Response> {
     // Parse the request body to potentially inject user info
     let body = req.body();
@@ -30,8 +34,8 @@ pub async fn forward_to_mcp_gateway(
         }
     };
 
-    // If this is an initialize request and we have claims, inject user info
-    if let Some(ref claims) = claims {
+    // If this is an initialize request and we have auth context, inject user info
+    if let Some((ref _claims, ref user_context)) = auth_context {
         if let Some(obj) = request_data.as_object_mut() {
             if let Some(method) = obj.get("method").and_then(|m| m.as_str()) {
                 if method == "initialize" {
@@ -40,8 +44,9 @@ pub async fn forward_to_mcp_gateway(
                         params.insert(
                             "_authContext".to_string(),
                             serde_json::json!({
-                                "authenticated_user": claims.sub,
-                                "email": claims.email,
+                                "authenticated_user": user_context.id,
+                                "email": user_context.email,
+                                "provider": user_context.provider,
                             }),
                         );
                     }
@@ -75,6 +80,7 @@ pub async fn forward_to_mcp_gateway(
         .method(req.method().clone())
         .uri(&config.mcp_gateway_url)
         .header("Content-Type", "application/json")
+        .header("X-Trace-Id", trace_id)
         .body(forward_body)
         .build();
 
@@ -101,8 +107,8 @@ pub async fn forward_to_mcp_gateway(
         }
     };
 
-    // If this is an initialize response and we have claims, inject auth info into serverInfo
-    if let Some(ref claims) = claims {
+    // If this is an initialize response and we have auth context, inject auth info into serverInfo
+    if let Some((ref _claims, ref user_context)) = auth_context {
         if let Some(result) = response_data
             .as_object_mut()
             .and_then(|obj| obj.get_mut("result"))
@@ -115,8 +121,9 @@ pub async fn forward_to_mcp_gateway(
                 server_info.insert(
                     "authInfo".to_string(),
                     serde_json::json!({
-                        "authenticated_user": claims.sub,
-                        "email": claims.email,
+                        "authenticated_user": user_context.id,
+                        "email": user_context.email,
+                        "provider": user_context.provider,
                     }),
                 );
             }
@@ -135,8 +142,8 @@ pub async fn forward_to_mcp_gateway(
         Ok(Response::builder()
             .status(*resp.status())
             .header("Content-Type", "application/json")
+            .header("X-Trace-Id", trace_id)
             .body(serde_json::to_string(&response_data)?)
             .build())
     }
 }
-

@@ -1,0 +1,29 @@
+spin_manifest_version = 2
+
+[application]
+name = "ftl-auth-gateway"
+version = "0.0.1"
+authors = ["FTL Contributors"]
+description = "Authentication gateway for FTL MCP servers"
+
+[[trigger.http]]
+route = "/..."
+component = "ftl-auth-gateway"
+
+[component.ftl-auth-gateway]
+source = "target/wasm32-wasip1/release/ftl_auth_gateway.wasm"
+allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app", "https://*.auth0.com"]
+[component.ftl-auth-gateway.build]
+command = "cargo build --target wasm32-wasip1 --release"
+workdir = "."
+watch = ["src/**/*.rs", "Cargo.toml"]
+[component.ftl-auth-gateway.variables]
+# Required: JSON configuration for authentication providers
+# Default is an empty provider list - must be configured for production use
+auth_config = ""
+
+# Test configuration
+[component.ftl-auth-gateway.tool.spin-test]
+source = "target/wasm32-wasip1/release/tests.wasm"
+build = "cargo component build --release"
+workdir = "tests"

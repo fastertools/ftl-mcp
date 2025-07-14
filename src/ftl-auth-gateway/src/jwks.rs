@@ -134,8 +134,9 @@ pub async fn get_decoding_key(jwks_uri: &str, kid: &str) -> Result<DecodingKey> 
                     x5c.first()
                         .ok_or_else(|| anyhow!("No certificate found in x5c"))
                         .and_then(|cert| {
-                            DecodingKey::from_ec_pem(cert.as_bytes())
-                                .map_err(|e| anyhow!("Failed to create EC key from certificate: {e}"))
+                            DecodingKey::from_ec_pem(cert.as_bytes()).map_err(|e| {
+                                anyhow!("Failed to create EC key from certificate: {e}")
+                            })
                         })
                 })
         }
@@ -179,4 +180,3 @@ pub async fn clear_cache() {
     let mut cache = JWKS_CACHE.write().await;
     cache.clear();
 }
-
