@@ -1,0 +1,20 @@
+[package]
+name = "tests"
+version = "0.1.0"
+edition = "2021"
+description = "Test suite for ftl-auth-gateway"
+license = "Apache-2.0"
+repository = "https://github.com/fastertools/ftl-mcp"
+readme = "../README.md"
+keywords = ["testing", "spin", "webassembly"]
+categories = ["development-tools::testing"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+spin-test-sdk = { git = "https://github.com/spinframework/spin-test", version = "0.1.0" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+jsonwebtoken = "9.3"
+base64 = "0.22"

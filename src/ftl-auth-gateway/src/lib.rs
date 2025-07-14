@@ -1,37 +1,30 @@
 use anyhow::Result;
-use spin_sdk::http::{IntoResponse, Method, Request, Response};
-use spin_sdk::variables;
+use spin_sdk::http::{IntoResponse, Request};
 
 mod auth;
+mod config;
+mod handlers;
 mod jwks;
+mod logging;
 mod metadata;
+mod providers;
 mod proxy;
 
-use auth::{verify_request, AuthKitConfig};
-use metadata::handle_metadata_request;
-use proxy::forward_to_mcp_gateway;
+use config::GatewayConfig;
+use handlers::{handle_authenticated_request, handle_cors_preflight, handle_metadata_endpoints};
+use logging::{get_trace_id, Logger};
 
 /// Main entry point for the authentication gateway
 #[spin_sdk::http_component]
 async fn handle_request(req: Request) -> Result<impl IntoResponse> {
-    // Load AuthKit configuration from Spin variables
-    let config = AuthKitConfig {
-        issuer: variables::get("authkit_issuer")
-            .unwrap_or_else(|_| "https://example.authkit.app".to_string()),
-        jwks_uri: variables::get("authkit_jwks_uri")
-            .ok()
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| {
-                let issuer = variables::get("authkit_issuer")
-                    .unwrap_or_else(|_| "https://example.authkit.app".to_string());
-                format!("{issuer}/oauth2/jwks")
-            }),
-        audience: variables::get("authkit_audience")
-            .ok()
-            .filter(|s| !s.is_empty()),
-        mcp_gateway_url: variables::get("mcp_gateway_url")
-            .unwrap_or_else(|_| "http://ftl-mcp-gateway.spin.internal/mcp-internal".to_string()),
-    };
+    // Load gateway configuration
+    let config = GatewayConfig::from_spin_vars()?;
+    let registry = config.build_registry();
+
+    // Extract trace ID for structured logging
+    let trace_id = get_trace_id(&req, &config.trace_id_header);
+    let logger = Logger::new(&trace_id);
+
 
     let path = req.path();
     let method = req.method();
@@ -42,91 +35,30 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
         .headers()
         .find(|(name, _)| name.eq_ignore_ascii_case("host"))
         .and_then(|(_, value)| value.as_str())
+        .map(String::from)
         .or_else(|| {
             req.headers()
                 .find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-host"))
                 .and_then(|(_, value)| value.as_str())
+                .map(String::from)
         })
         .or_else(|| {
             req.headers()
                 .find(|(name, _)| name.eq_ignore_ascii_case("x-original-host"))
                 .and_then(|(_, value)| value.as_str())
+                .map(String::from)
         });
 
-    // Only log headers for metadata endpoints to reduce noise
-    if matches!(
-        path,
-        "/.well-known/oauth-protected-resource" | "/.well-known/oauth-authorization-server"
-    ) {
-        eprintln!("=== Metadata request to {path} ===");
-        eprintln!("Selected host: {host:?}");
-
-        // Log specific headers we care about
-        if let Some((_, value)) = req
-            .headers()
-            .find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-host"))
-        {
-            let val = value.as_str();
-            eprintln!("X-Forwarded-Host: {val:?}");
-        }
-        if let Some((_, value)) = req
-            .headers()
-            .find(|(name, _)| name.eq_ignore_ascii_case("x-forwarded-proto"))
-        {
-            let val = value.as_str();
-            eprintln!("X-Forwarded-Proto: {val:?}");
-        }
-        if let Some((_, value)) = req
-            .headers()
-            .find(|(name, _)| name.eq_ignore_ascii_case("host"))
-        {
-            let val = value.as_str();
-            eprintln!("Host: {val:?}");
-        }
+    // Handle metadata endpoints
+    if let Some(response) = handle_metadata_endpoints(path, &registry, host.as_deref(), &req, &logger) {
+        return Ok(response);
     }
 
-    // Handle metadata endpoints (no auth required)
-    if matches!(
-        path,
-        "/.well-known/oauth-protected-resource" | "/.well-known/oauth-authorization-server"
-    ) {
-        return Ok(handle_metadata_request(path, &config, host, &req));
-    }
-
-    // Handle OPTIONS requests (CORS preflight)
-    if *method == Method::Options {
-        return Ok(Response::builder()
-            .status(204)
-            .header("Access-Control-Allow-Origin", "*")
-            .header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-            .header(
-                "Access-Control-Allow-Headers",
-                "Content-Type, Authorization",
-            )
-            .header("Access-Control-Max-Age", "86400")
-            .build());
+    // Handle CORS preflight
+    if let Some(response) = handle_cors_preflight(method) {
+        return Ok(response);
     }
 
     // All other requests require authentication
-    match verify_request(&req, &config, host).await {
-        Ok(claims) => {
-            eprintln!("Authentication successful, forwarding to MCP gateway");
-            // Forward authenticated request to MCP gateway
-            match forward_to_mcp_gateway(req, &config, Some(claims)).await {
-                Ok(response) => Ok(response),
-                Err(e) => {
-                    eprintln!("Failed to forward request to MCP gateway: {e}");
-                    Ok(Response::builder()
-                        .status(502)
-                        .body(format!("Gateway error: {e}"))
-                        .build())
-                }
-            }
-        }
-        Err(auth_error) => {
-            eprintln!("Authentication failed, returning 401");
-            Ok(auth_error)
-        }
-    }
+    Ok(handle_authenticated_request(req, &config, &registry, host.as_deref(), &trace_id, &logger).await)
 }
-

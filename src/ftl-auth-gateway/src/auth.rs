@@ -3,14 +3,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use spin_sdk::http::{Request, Response};
 
-use crate::jwks;
+use crate::{
+    jwks,
+    providers::{AuthProvider, UserContext},
+};
 
-/// Configuration for `AuthKit`
+/// Authentication gateway configuration
 #[derive(Debug, Clone)]
-pub struct AuthKitConfig {
-    pub issuer: String,
-    pub jwks_uri: String,
-    pub audience: Option<String>,
+pub struct AuthConfig {
     pub mcp_gateway_url: String,
 }
 
@@ -33,7 +33,7 @@ fn extract_bearer_token(auth_header: &str) -> Option<&str> {
 }
 
 /// Build authentication error response
-pub fn auth_error_response(error: &str, host: Option<&str>) -> Response {
+pub fn auth_error_response(error: &str, host: Option<&str>, trace_id: Option<&str>) -> Response {
     let www_auth = host.map_or_else(
         || format!(r#"Bearer error="unauthorized", error_description="{error}""#),
         |h| format!(
@@ -46,16 +46,26 @@ pub fn auth_error_response(error: &str, host: Option<&str>) -> Response {
         "error_description": error
     });
 
-    Response::builder()
-        .status(401)
-        .header("WWW-Authenticate", www_auth)
-        .header("Content-Type", "application/json")
-        .body(body.to_string())
-        .build()
+    if let Some(trace_id) = trace_id {
+        Response::builder()
+            .status(401)
+            .header("WWW-Authenticate", www_auth)
+            .header("Content-Type", "application/json")
+            .header("X-Trace-Id", trace_id)
+            .body(body.to_string())
+            .build()
+    } else {
+        Response::builder()
+            .status(401)
+            .header("WWW-Authenticate", www_auth)
+            .header("Content-Type", "application/json")
+            .body(body.to_string())
+            .build()
+    }
 }
 
 /// Verify `JWT` token with proper signature verification
-async fn verify_token(token: &str, config: &AuthKitConfig) -> Result<Claims, String> {
+async fn verify_token(token: &str, provider: &dyn AuthProvider) -> Result<Claims, String> {
     // Decode the header to get the key ID and algorithm
     let header = decode_header(token).map_err(|_| "Invalid token format".to_string())?;
 
@@ -65,21 +75,21 @@ async fn verify_token(token: &str, config: &AuthKitConfig) -> Result<Claims, Str
         .ok_or_else(|| "Invalid token format".to_string())?;
 
     // Fetch the appropriate decoding key from JWKS
-    let decoding_key = jwks::get_decoding_key(&config.jwks_uri, &kid)
+    let decoding_key = jwks::get_decoding_key(provider.jwks_uri(), &kid)
         .await
         .map_err(|e| {
             eprintln!(
                 "Failed to get decoding key for kid '{kid}' from {}: {e}",
-                &config.jwks_uri
+                provider.jwks_uri()
             );
             "Token validation failed".to_string()
         })?;
 
     // Set up validation parameters
     let mut validation = Validation::new(header.alg);
-    validation.set_issuer(&[&config.issuer]);
+    validation.set_issuer(&[provider.issuer()]);
 
-    if let Some(aud) = &config.audience {
+    if let Some(aud) = provider.audience() {
         if aud.is_empty() {
             // Empty audience means don't validate
             eprintln!("Skipping audience validation (empty audience configured)");
@@ -112,9 +122,10 @@ async fn verify_token(token: &str, config: &AuthKitConfig) -> Result<Claims, Str
 /// Verify the request has valid authentication
 pub async fn verify_request(
     req: &Request,
-    config: &AuthKitConfig,
+    provider: &dyn AuthProvider,
     host: Option<&str>,
-) -> Result<Claims, Response> {
+    trace_id: Option<&str>,
+) -> Result<(Claims, UserContext), Response> {
     // Extract authorization header
     let auth_header = req
         .headers()
@@ -122,13 +133,18 @@ pub async fn verify_request(
         .and_then(|(_, value)| value.as_str());
 
     let Some(auth) = auth_header else {
-        return Err(auth_error_response("Missing authorization header", host));
+        return Err(auth_error_response(
+            "Missing authorization header",
+            host,
+            trace_id,
+        ));
     };
 
     let Some(token) = extract_bearer_token(auth) else {
         return Err(auth_error_response(
             "Invalid authorization header format",
             host,
+            trace_id,
         ));
     };
 
@@ -136,9 +152,11 @@ pub async fn verify_request(
     // eprintln!("Verifying token with issuer: {}", &config.issuer);
     // eprintln!("JWKS URI: {}", &config.jwks_uri);
 
-    match verify_token(token, config).await {
-        Ok(claims) => Ok(claims),
-        Err(e) => Err(auth_error_response(&e, host)),
+    match verify_token(token, provider).await {
+        Ok(claims) => {
+            let user_context = provider.extract_user_context(&claims);
+            Ok((claims, user_context))
+        }
+        Err(e) => Err(auth_error_response(&e, host, trace_id)),
     }
 }
-
