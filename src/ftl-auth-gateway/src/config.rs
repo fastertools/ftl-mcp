@@ -48,16 +48,16 @@ impl GatewayConfig {
             .unwrap_or_else(|_| "false".to_string())
             .parse::<bool>()
             .unwrap_or(false);
-        
+
         let mcp_gateway_url = variables::get("auth_gateway_url")
             .unwrap_or_else(|_| "http://ftl-mcp-gateway.spin.internal/mcp-internal".to_string());
-        
-        let trace_id_header = variables::get("auth_trace_header")
-            .unwrap_or_else(|_| "X-Trace-Id".to_string());
+
+        let trace_id_header =
+            variables::get("auth_trace_header").unwrap_or_else(|_| "X-Trace-Id".to_string());
 
         // Read provider configuration
         let provider_type = variables::get("auth_provider_type").unwrap_or_default();
-        
+
         let provider = if provider_type.is_empty() {
             None
         } else {
@@ -76,7 +76,7 @@ impl GatewayConfig {
     fn load_provider_config(provider_type: &str) -> Result<ProviderConfig> {
         let issuer = variables::get("auth_provider_issuer")
             .context("auth_provider_issuer is required when auth_provider_type is set")?;
-        
+
         let audience = variables::get("auth_provider_audience")
             .ok()
             .filter(|s| !s.is_empty());
@@ -86,7 +86,7 @@ impl GatewayConfig {
                 let jwks_uri = variables::get("auth_provider_jwks_uri")
                     .ok()
                     .filter(|s| !s.is_empty());
-                
+
                 Ok(ProviderConfig::AuthKit {
                     issuer,
                     jwks_uri,
@@ -105,7 +105,7 @@ impl GatewayConfig {
                 let userinfo_endpoint = variables::get("auth_provider_userinfo_endpoint")
                     .ok()
                     .filter(|s| !s.is_empty());
-                
+
                 let allowed_domains = variables::get("auth_provider_allowed_domains")
                     .unwrap_or_default()
                     .split(',')
@@ -124,7 +124,10 @@ impl GatewayConfig {
                     allowed_domains,
                 })
             }
-            _ => anyhow::bail!("Unknown auth provider type: {}. Expected 'authkit' or 'oidc'", provider_type)
+            _ => anyhow::bail!(
+                "Unknown auth provider type: {}. Expected 'authkit' or 'oidc'",
+                provider_type
+            ),
         }
     }
 

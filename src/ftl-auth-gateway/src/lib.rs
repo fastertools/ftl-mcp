@@ -19,21 +19,21 @@ use logging::{get_trace_id, Logger};
 async fn handle_request(req: Request) -> Result<impl IntoResponse> {
     // Load gateway configuration
     let config = GatewayConfig::from_spin_vars()?;
-    
+
     // Check if authentication is enabled right at the entry point
     if !config.enabled {
         // Bypass everything and forward directly to MCP gateway
         let trace_id = get_trace_id(&req, &config.trace_id_header);
         let logger = Logger::new(&trace_id);
-        
+
         logger
             .info("Authentication disabled, forwarding request directly")
             .emit();
-        
+
         let auth_config = auth::AuthConfig {
             mcp_gateway_url: config.mcp_gateway_url.clone(),
         };
-        
+
         match proxy::forward_to_mcp_gateway(req, &auth_config, None, &trace_id).await {
             Ok(response) => return Ok(response),
             Err(e) => {
@@ -41,12 +41,10 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
                     .error("Failed to forward request to MCP gateway")
                     .field("error", &e)
                     .emit();
-                return Ok(
-                    spin_sdk::http::Response::builder()
-                        .status(502)
-                        .body(format!("Gateway error: {e}"))
-                        .build()
-                );
+                return Ok(spin_sdk::http::Response::builder()
+                    .status(502)
+                    .body(format!("Gateway error: {e}"))
+                    .build());
             }
         }
     }
@@ -83,7 +81,13 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
         });
 
     // Handle metadata endpoints
-    if let Some(response) = handle_metadata_endpoints(path, provider, host.as_deref(), &req, &logger) {
+    if let Some(response) = handle_metadata_endpoints(
+        path,
+        provider.map(std::convert::AsRef::as_ref),
+        host.as_deref(),
+        &req,
+        &logger,
+    ) {
         return Ok(response);
     }
 
@@ -93,5 +97,13 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
     }
 
     // All other requests require authentication
-    Ok(handle_authenticated_request(req, &config, provider, host.as_deref(), &trace_id, &logger).await)
+    Ok(handle_authenticated_request(
+        req,
+        &config,
+        provider.map(std::convert::AsRef::as_ref),
+        host.as_deref(),
+        &trace_id,
+        &logger,
+    )
+    .await)
 }

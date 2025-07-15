@@ -11,7 +11,7 @@ use crate::{
 /// Handle metadata endpoints (no auth required)
 pub fn handle_metadata_endpoints(
     path: &str,
-    provider: Option<&Box<dyn crate::providers::AuthProvider>>,
+    provider: Option<&dyn crate::providers::AuthProvider>,
     host: Option<&str>,
     req: &Request,
     logger: &Logger<'_>,
@@ -39,14 +39,7 @@ pub fn handle_metadata_endpoints(
                     .build(),
             )
         },
-        |p| {
-            Some(handle_metadata_request(
-                path,
-                p.as_ref(),
-                host,
-                req,
-            ))
-        },
+        |p| Some(handle_metadata_request(path, p, host, req)),
     )
 }
 
@@ -74,15 +67,13 @@ pub fn handle_cors_preflight(method: &Method) -> Option<Response> {
 pub async fn handle_authenticated_request(
     req: Request,
     config: &GatewayConfig,
-    provider: Option<&Box<dyn crate::providers::AuthProvider>>,
+    provider: Option<&dyn crate::providers::AuthProvider>,
     host: Option<&str>,
     trace_id: &str,
     logger: &Logger<'_>,
 ) -> Response {
     let Some(p) = provider else {
-        logger
-            .warn("No authentication provider configured")
-            .emit();
+        logger.warn("No authentication provider configured").emit();
         return auth::auth_error_response(
             "No authentication provider configured",
             host,
@@ -90,7 +81,7 @@ pub async fn handle_authenticated_request(
         );
     };
 
-    match verify_request(&req, p.as_ref(), host, Some(trace_id)).await {
+    match verify_request(&req, p, host, Some(trace_id)).await {
         Ok((claims, user_context)) => {
             logger
                 .info("Authentication successful")
@@ -103,13 +94,8 @@ pub async fn handle_authenticated_request(
                 mcp_gateway_url: config.mcp_gateway_url.clone(),
             };
 
-            match forward_to_mcp_gateway(
-                req,
-                &auth_config,
-                Some((claims, user_context)),
-                trace_id,
-            )
-            .await
+            match forward_to_mcp_gateway(req, &auth_config, Some((claims, user_context)), trace_id)
+                .await
             {
                 Ok(response) => response,
                 Err(e) => {
