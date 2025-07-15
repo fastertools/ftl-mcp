@@ -8,45 +8,50 @@ description = "{{project-description}}"
 
 [variables]
 tool_components = { default = "" }
-# ========================================
-# Available auth provider configurations
-# ========================================
 
+# ========================================
+# Auth Gateway Configuration
+# ========================================
+# Authentication is DISABLED by default. To enable, set auth_enabled = "true"
+
+# Core auth settings
+auth_enabled = { default = "false" }
+auth_gateway_url = { default = "http://ftl-mcp-gateway.spin.internal/mcp-internal" }
+auth_trace_header = { default = "X-Trace-Id" }
+
+# Provider configuration (required when auth_enabled = "true")
+auth_provider_type = { default = "" }  # "authkit" or "oidc"
+auth_provider_issuer = { default = "" }
+auth_provider_audience = { default = "" }
+
+# OIDC-specific settings (only required for auth_provider_type = "oidc")
+auth_provider_name = { default = "" }
+auth_provider_jwks_uri = { default = "" }
+auth_provider_authorize_endpoint = { default = "" }
+auth_provider_token_endpoint = { default = "" }
+auth_provider_userinfo_endpoint = { default = "" }
+auth_provider_allowed_domains = { default = "" }  # comma-separated list
+
+# ========================================
+# Example configurations:
+# ========================================
 # AuthKit:
-# {
-#   "type": "authkit",
-#   "issuer": "https://your-tenant.authkit.app",
-#   "audience": "mcp-api"  // optional
-# }
-
-# Generic OIDC (Auth0, Keycloak, etc):
-# {
-#   "type": "oidc",
-#   "name": "auth0",
-#   "issuer": "https://your-domain.auth0.com",
-#   "jwks_uri": "https://your-domain.auth0.com/.well-known/jwks.json",
-#   "authorization_endpoint": "https://your-domain.auth0.com/authorize",
-#   "token_endpoint": "https://your-domain.auth0.com/oauth/token",
-#   "userinfo_endpoint": "https://your-domain.auth0.com/userinfo",  // optional
-#   "audience": "your-api-identifier",  // optional
-#   "allowed_domains": ["*.auth0.com"]  // optional
-# }
+#   auth_enabled = "true"
+#   auth_provider_type = "authkit"
+#   auth_provider_issuer = "https://your-tenant.authkit.app"
+#   auth_provider_audience = "mcp-api"  # optional
 #
-# Auth gateway configuration - auth is DISABLED by default
-# To enable auth, set SPIN_VARIABLE_AUTH_CONFIG with your auth configuration or edit the block below.
-auth_config = { default = '''
-{
-  "mcp_gateway_url": "http://ftl-mcp-gateway.spin.internal/mcp-internal",
-  "trace_id_header": "X-Trace-Id",
-  "enabled": false,
-  "providers": [
-    {
-      "type": "authkit",
-      "issuer": "https://your-tenant.authkit.app"
-    }
-  ]
-}
-''' }
+# Auth0:
+#   auth_enabled = "true"
+#   auth_provider_type = "oidc"
+#   auth_provider_name = "auth0"
+#   auth_provider_issuer = "https://your-domain.auth0.com"
+#   auth_provider_jwks_uri = "https://your-domain.auth0.com/.well-known/jwks.json"
+#   auth_provider_authorize_endpoint = "https://your-domain.auth0.com/authorize"
+#   auth_provider_token_endpoint = "https://your-domain.auth0.com/oauth/token"
+#   auth_provider_userinfo_endpoint = "https://your-domain.auth0.com/userinfo"  # optional
+#   auth_provider_audience = "your-api-identifier"  # optional
+#   auth_provider_allowed_domains = "*.auth0.com"  # optional
 
 # Auth Gateway - handles authentication and OAuth discovery
 [[trigger.http]]
@@ -62,10 +67,21 @@ route = "/.well-known/oauth-authorization-server"
 component = "mcp"
 
 [component.mcp]
-source = { registry = "ghcr.io", package = "fastertools:ftl-auth-gateway", version = "0.0.4" }
+source = { registry = "ghcr.io", package = "fastertools:ftl-auth-gateway", version = "0.0.6" }
 allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app"]
 [component.mcp.variables]
-auth_config = "{% raw %}{{ auth_config }}{% endraw %}"
+auth_enabled = "{% raw %}{{ auth_enabled }}{% endraw %}"
+auth_gateway_url = "{% raw %}{{ auth_gateway_url }}{% endraw %}"
+auth_trace_header = "{% raw %}{{ auth_trace_header }}{% endraw %}"
+auth_provider_type = "{% raw %}{{ auth_provider_type }}{% endraw %}"
+auth_provider_issuer = "{% raw %}{{ auth_provider_issuer }}{% endraw %}"
+auth_provider_audience = "{% raw %}{{ auth_provider_audience }}{% endraw %}"
+auth_provider_name = "{% raw %}{{ auth_provider_name }}{% endraw %}"
+auth_provider_jwks_uri = "{% raw %}{{ auth_provider_jwks_uri }}{% endraw %}"
+auth_provider_authorize_endpoint = "{% raw %}{{ auth_provider_authorize_endpoint }}{% endraw %}"
+auth_provider_token_endpoint = "{% raw %}{{ auth_provider_token_endpoint }}{% endraw %}"
+auth_provider_userinfo_endpoint = "{% raw %}{{ auth_provider_userinfo_endpoint }}{% endraw %}"
+auth_provider_allowed_domains = "{% raw %}{{ auth_provider_allowed_domains }}{% endraw %}"
 
 # MCP Gateway - internal endpoint (protected by auth gateway)
 [[trigger.http]]
