@@ -72,10 +72,27 @@ impl GatewayConfig {
         })
     }
 
+    /// Ensure URL uses HTTPS protocol. Adds https:// if no protocol specified.
+    /// Returns error if http:// is explicitly used.
+    fn ensure_https_url(url: String) -> Result<String> {
+        if url.starts_with("http://") {
+            anyhow::bail!(
+                "Auth provider URLs must use HTTPS. HTTP is not allowed for security reasons. \
+                If you meant to use HTTPS, either provide just the domain (e.g., \"example.authkit.app\") \
+                or the full HTTPS URL (e.g., \"https://example.authkit.app\")."
+            )
+        } else if url.starts_with("https://") {
+            Ok(url)
+        } else {
+            Ok(format!("https://{url}"))
+        }
+    }
+
     /// Load provider configuration from variables
     fn load_provider_config(provider_type: &str) -> Result<ProviderConfig> {
         let issuer = variables::get("auth_provider_issuer")
             .context("auth_provider_issuer is required when auth_provider_type is set")?;
+        let issuer = Self::ensure_https_url(issuer)?;
 
         let audience = variables::get("auth_provider_audience")
             .ok()
@@ -96,15 +113,24 @@ impl GatewayConfig {
             "oidc" => {
                 let name = variables::get("auth_provider_name")
                     .context("auth_provider_name is required for OIDC provider")?;
+
                 let jwks_uri = variables::get("auth_provider_jwks_uri")
                     .context("auth_provider_jwks_uri is required for OIDC provider")?;
+                let jwks_uri = Self::ensure_https_url(jwks_uri)?;
+
                 let authorization_endpoint = variables::get("auth_provider_authorize_endpoint")
                     .context("auth_provider_authorize_endpoint is required for OIDC provider")?;
+                let authorization_endpoint = Self::ensure_https_url(authorization_endpoint)?;
+
                 let token_endpoint = variables::get("auth_provider_token_endpoint")
                     .context("auth_provider_token_endpoint is required for OIDC provider")?;
+                let token_endpoint = Self::ensure_https_url(token_endpoint)?;
+
                 let userinfo_endpoint = variables::get("auth_provider_userinfo_endpoint")
                     .ok()
-                    .filter(|s| !s.is_empty());
+                    .filter(|s| !s.is_empty())
+                    .map(Self::ensure_https_url)
+                    .transpose()?;
 
                 let allowed_domains = variables::get("auth_provider_allowed_domains")
                     .unwrap_or_default()
@@ -241,5 +267,45 @@ mod tests {
 
         assert!(!config.enabled);
         assert!(config.provider.is_none());
+    }
+
+    #[test]
+    fn test_ensure_https_url() {
+        // Test with https:// already present
+        assert_eq!(
+            GatewayConfig::ensure_https_url("https://example.com".to_string()).unwrap(),
+            "https://example.com"
+        );
+
+        // Test with http:// should fail
+        let result = GatewayConfig::ensure_https_url("http://example.com".to_string());
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Auth provider URLs must use HTTPS"));
+
+        // Test without protocol - should add https://
+        assert_eq!(
+            GatewayConfig::ensure_https_url("example.com".to_string()).unwrap(),
+            "https://example.com"
+        );
+
+        // Test with domain and path
+        assert_eq!(
+            GatewayConfig::ensure_https_url("example.com/path".to_string()).unwrap(),
+            "https://example.com/path"
+        );
+
+        // Test with AuthKit style domain
+        assert_eq!(
+            GatewayConfig::ensure_https_url("divine-lion-50-staging.authkit.app".to_string())
+                .unwrap(),
+            "https://divine-lion-50-staging.authkit.app"
+        );
+
+        // Test with http://localhost should also fail
+        let result = GatewayConfig::ensure_https_url("http://localhost:8080".to_string());
+        assert!(result.is_err());
     }
 }

@@ -8,9 +8,14 @@ build:
 build-component:
 	cargo component build --target wasm32-wasip1 --release
 
-# Run tests
-test:
+test-cargo:
 	cargo test
+
+test-spin:
+	spin test
+
+# Run tests
+test: test-cargo test-spin
 
 # Clean build artifacts
 clean:

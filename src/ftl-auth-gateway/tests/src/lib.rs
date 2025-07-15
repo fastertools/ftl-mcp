@@ -1,4 +1,7 @@
-use spin_test_sdk::{bindings::wasi::http, spin_test};
+use spin_test_sdk::{
+    bindings::{fermyon::spin_test_virt, wasi::http},
+    spin_test,
+};
 
 // Note: Test configuration is provided by spin-test.toml
 // Auth is enabled with an AuthKit provider configured
@@ -173,4 +176,82 @@ fn metadata_endpoint_with_provider() {
         .iter()
         .any(|(name, _)| name == "content-type");
     assert!(has_content_type);
+}
+
+#[spin_test]
+fn https_enforcement_rejects_http() {
+    // Test that HTTP URLs are rejected for security
+    // Override the test config to use HTTP
+    spin_test_virt::variables::set("auth_enabled", "true");
+    spin_test_virt::variables::set("auth_provider_type", "authkit");
+    spin_test_virt::variables::set("auth_provider_issuer", "http://example.authkit.app");
+
+    // Try to make a request - the component should fail to initialize
+    let request = http::types::OutgoingRequest::new(http::types::Headers::new());
+    request.set_path_with_query(Some("/mcp")).unwrap();
+    let response = spin_test_sdk::perform_request(request);
+
+    // Should get an internal error because the component failed to initialize
+    assert_eq!(response.status(), 500);
+}
+
+#[spin_test]
+fn https_enforcement_accepts_bare_domain() {
+    // Test that bare domains work (https:// is added automatically)
+    spin_test_virt::variables::set("auth_enabled", "true");
+    spin_test_virt::variables::set("auth_provider_type", "authkit");
+    spin_test_virt::variables::set("auth_provider_issuer", "example.authkit.app");
+    spin_test_virt::variables::set("auth_provider_jwks_uri", "");
+
+    // Make a metadata request to verify it initialized correctly
+    let request = http::types::OutgoingRequest::new(http::types::Headers::new());
+    request
+        .set_path_with_query(Some("/.well-known/oauth-authorization-server"))
+        .unwrap();
+    let response = spin_test_sdk::perform_request(request);
+
+    // Should return 200 because component initialized successfully
+    assert_eq!(response.status(), 200);
+}
+
+#[spin_test]
+fn https_enforcement_accepts_https_prefix() {
+    // Test that explicit https:// URLs work
+    spin_test_virt::variables::set("auth_enabled", "true");
+    spin_test_virt::variables::set("auth_provider_type", "authkit");
+    spin_test_virt::variables::set("auth_provider_issuer", "https://example.authkit.app");
+    spin_test_virt::variables::set("auth_provider_jwks_uri", "");
+
+    // Make a metadata request to verify it initialized correctly
+    let request = http::types::OutgoingRequest::new(http::types::Headers::new());
+    request
+        .set_path_with_query(Some("/.well-known/oauth-authorization-server"))
+        .unwrap();
+    let response = spin_test_sdk::perform_request(request);
+
+    // Should return 200 because component initialized successfully
+    assert_eq!(response.status(), 200);
+}
+
+#[spin_test]
+fn https_enforcement_oidc_urls() {
+    // Test that OIDC URLs also enforce HTTPS
+    spin_test_virt::variables::set("auth_enabled", "true");
+    spin_test_virt::variables::set("auth_provider_type", "oidc");
+    spin_test_virt::variables::set("auth_provider_name", "test");
+    spin_test_virt::variables::set("auth_provider_issuer", "https://example.com");
+    spin_test_virt::variables::set("auth_provider_jwks_uri", "http://example.com/jwks"); // HTTP should fail
+    spin_test_virt::variables::set("auth_provider_authorize_endpoint", "example.com/auth");
+    spin_test_virt::variables::set("auth_provider_token_endpoint", "example.com/token");
+    spin_test_virt::variables::set("auth_provider_userinfo_endpoint", "");
+    spin_test_virt::variables::set("auth_provider_allowed_domains", "");
+    spin_test_virt::variables::set("auth_provider_audience", "");
+
+    // Try to make a request - the component should fail to initialize
+    let request = http::types::OutgoingRequest::new(http::types::Headers::new());
+    request.set_path_with_query(Some("/mcp")).unwrap();
+    let response = spin_test_sdk::perform_request(request);
+
+    // Should get an internal error because the component failed to initialize
+    assert_eq!(response.status(), 500);
 }
