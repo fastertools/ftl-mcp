@@ -5,14 +5,13 @@ use crate::{
     config::GatewayConfig,
     logging::Logger,
     metadata::handle_metadata_request,
-    providers::ProviderRegistry,
     proxy::forward_to_mcp_gateway,
 };
 
 /// Handle metadata endpoints (no auth required)
 pub fn handle_metadata_endpoints(
     path: &str,
-    registry: &ProviderRegistry,
+    provider: Option<&Box<dyn crate::providers::AuthProvider>>,
     host: Option<&str>,
     req: &Request,
     logger: &Logger<'_>,
@@ -30,21 +29,20 @@ pub fn handle_metadata_endpoints(
         .field("host", host.unwrap_or("unknown"))
         .emit();
 
-    // For now, return metadata for the first provider
-    registry.providers().first().map_or_else(
+    provider.map_or_else(
         || {
-            logger.warn("No auth providers configured").emit();
+            logger.warn("No auth provider configured").emit();
             Some(
                 Response::builder()
                     .status(500)
-                    .body("No authentication providers configured")
+                    .body("No authentication provider configured")
                     .build(),
             )
         },
-        |provider| {
+        |p| {
             Some(handle_metadata_request(
                 path,
-                provider.as_ref(),
+                p.as_ref(),
                 host,
                 req,
             ))
@@ -76,63 +74,62 @@ pub fn handle_cors_preflight(method: &Method) -> Option<Response> {
 pub async fn handle_authenticated_request(
     req: Request,
     config: &GatewayConfig,
-    registry: &ProviderRegistry,
+    provider: Option<&Box<dyn crate::providers::AuthProvider>>,
     host: Option<&str>,
     trace_id: &str,
     logger: &Logger<'_>,
 ) -> Response {
-    let mut last_error = None;
-
-    for provider in registry.providers() {
-        match verify_request(&req, provider.as_ref(), host, Some(trace_id)).await {
-            Ok((claims, user_context)) => {
-                logger
-                    .info("Authentication successful")
-                    .field("provider", provider.name())
-                    .field("user_id", &user_context.id)
-                    .emit();
-
-                // Forward authenticated request to MCP gateway
-                let auth_config = crate::auth::AuthConfig {
-                    mcp_gateway_url: config.mcp_gateway_url.clone(),
-                };
-
-                match forward_to_mcp_gateway(
-                    req,
-                    &auth_config,
-                    Some((claims, user_context)),
-                    trace_id,
-                )
-                .await
-                {
-                    Ok(response) => return response,
-                    Err(e) => {
-                        logger
-                            .error("Failed to forward request to MCP gateway")
-                            .field("error", &e)
-                            .emit();
-                        return Response::builder()
-                            .status(502)
-                            .body(format!("Gateway error: {e}"))
-                            .build();
-                    }
-                }
-            }
-            Err(auth_error) => {
-                last_error = Some(auth_error);
-            }
-        }
-    }
-
-    // If we get here, authentication failed with all providers
-    logger
-        .warn("Authentication failed with all providers")
-        .emit();
-    last_error.unwrap_or_else(|| {
-        auth::auth_error_response(
-            "No authentication providers configured",
+    let Some(p) = provider else {
+        logger
+            .warn("No authentication provider configured")
+            .emit();
+        return auth::auth_error_response(
+            "No authentication provider configured",
             host,
             Some(trace_id),
-        )
-    })
+        );
+    };
+
+    match verify_request(&req, p.as_ref(), host, Some(trace_id)).await {
+        Ok((claims, user_context)) => {
+            logger
+                .info("Authentication successful")
+                .field("provider", p.name())
+                .field("user_id", &user_context.id)
+                .emit();
+
+            // Forward authenticated request to MCP gateway
+            let auth_config = crate::auth::AuthConfig {
+                mcp_gateway_url: config.mcp_gateway_url.clone(),
+            };
+
+            match forward_to_mcp_gateway(
+                req,
+                &auth_config,
+                Some((claims, user_context)),
+                trace_id,
+            )
+            .await
+            {
+                Ok(response) => response,
+                Err(e) => {
+                    logger
+                        .error("Failed to forward request to MCP gateway")
+                        .field("error", &e)
+                        .emit();
+                    Response::builder()
+                        .status(502)
+                        .body(format!("Gateway error: {e}"))
+                        .build()
+                }
+            }
+        }
+        Err(auth_error) => {
+            logger
+                .warn("Authentication failed")
+                .field("provider", p.name())
+                .emit();
+            auth_error
+        }
+    }
 }

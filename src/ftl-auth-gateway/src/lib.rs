@@ -53,6 +53,7 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
 
     // Authentication is enabled, proceed with normal auth flow
     let registry = config.build_registry();
+    let provider = registry.providers().first();
 
     // Extract trace ID for structured logging
     let trace_id = get_trace_id(&req, &config.trace_id_header);
@@ -82,7 +83,7 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
         });
 
     // Handle metadata endpoints
-    if let Some(response) = handle_metadata_endpoints(path, &registry, host.as_deref(), &req, &logger) {
+    if let Some(response) = handle_metadata_endpoints(path, provider, host.as_deref(), &req, &logger) {
         return Ok(response);
     }
 
@@ -92,5 +93,5 @@ async fn handle_request(req: Request) -> Result<impl IntoResponse> {
     }
 
     // All other requests require authentication
-    Ok(handle_authenticated_request(req, &config, &registry, host.as_deref(), &trace_id, &logger).await)
+    Ok(handle_authenticated_request(req, &config, provider, host.as_deref(), &trace_id, &logger).await)
 }

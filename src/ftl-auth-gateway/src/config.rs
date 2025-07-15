@@ -9,13 +9,8 @@ use crate::providers::{AuthKitProvider, OidcProvider, OidcProviderConfig, Provid
 pub struct GatewayConfig {
     pub mcp_gateway_url: String,
     pub trace_id_header: String,
-    #[serde(default = "default_enabled")]
     pub enabled: bool,
-    pub providers: Vec<ProviderConfig>,
-}
-
-fn default_enabled() -> bool {
-    true
+    pub provider: Option<ProviderConfig>,
 }
 
 /// Provider configuration enum
@@ -48,27 +43,96 @@ pub enum ProviderConfig {
 impl GatewayConfig {
     /// Load configuration from Spin variables
     pub fn from_spin_vars() -> Result<Self> {
-        let config_json = variables::get("auth_config")
-            .context("Missing required 'auth_config' variable")?;
+        // Read core settings
+        let enabled = variables::get("auth_enabled")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
+        
+        let mcp_gateway_url = variables::get("auth_gateway_url")
+            .unwrap_or_else(|_| "http://ftl-mcp-gateway.spin.internal/mcp-internal".to_string());
+        
+        let trace_id_header = variables::get("auth_trace_header")
+            .unwrap_or_else(|_| "X-Trace-Id".to_string());
 
-        if config_json.is_empty() {
-            // Return default config for tests
-            return Ok(Self {
-                mcp_gateway_url: "http://ftl-mcp-gateway.spin.internal/mcp-internal".to_string(),
-                trace_id_header: "X-Trace-Id".to_string(),
-                enabled: true,
-                providers: vec![],
-            });
+        // Read provider configuration
+        let provider_type = variables::get("auth_provider_type").unwrap_or_default();
+        
+        let provider = if provider_type.is_empty() {
+            None
+        } else {
+            Some(Self::load_provider_config(&provider_type)?)
+        };
+
+        Ok(Self {
+            mcp_gateway_url,
+            trace_id_header,
+            enabled,
+            provider,
+        })
+    }
+
+    /// Load provider configuration from variables
+    fn load_provider_config(provider_type: &str) -> Result<ProviderConfig> {
+        let issuer = variables::get("auth_provider_issuer")
+            .context("auth_provider_issuer is required when auth_provider_type is set")?;
+        
+        let audience = variables::get("auth_provider_audience")
+            .ok()
+            .filter(|s| !s.is_empty());
+
+        match provider_type {
+            "authkit" => {
+                let jwks_uri = variables::get("auth_provider_jwks_uri")
+                    .ok()
+                    .filter(|s| !s.is_empty());
+                
+                Ok(ProviderConfig::AuthKit {
+                    issuer,
+                    jwks_uri,
+                    audience,
+                })
+            }
+            "oidc" => {
+                let name = variables::get("auth_provider_name")
+                    .context("auth_provider_name is required for OIDC provider")?;
+                let jwks_uri = variables::get("auth_provider_jwks_uri")
+                    .context("auth_provider_jwks_uri is required for OIDC provider")?;
+                let authorization_endpoint = variables::get("auth_provider_authorize_endpoint")
+                    .context("auth_provider_authorize_endpoint is required for OIDC provider")?;
+                let token_endpoint = variables::get("auth_provider_token_endpoint")
+                    .context("auth_provider_token_endpoint is required for OIDC provider")?;
+                let userinfo_endpoint = variables::get("auth_provider_userinfo_endpoint")
+                    .ok()
+                    .filter(|s| !s.is_empty());
+                
+                let allowed_domains = variables::get("auth_provider_allowed_domains")
+                    .unwrap_or_default()
+                    .split(',')
+                    .filter(|s| !s.trim().is_empty())
+                    .map(|s| s.trim().to_string())
+                    .collect();
+
+                Ok(ProviderConfig::Oidc {
+                    name,
+                    issuer,
+                    jwks_uri,
+                    audience,
+                    authorization_endpoint,
+                    token_endpoint,
+                    userinfo_endpoint,
+                    allowed_domains,
+                })
+            }
+            _ => anyhow::bail!("Unknown auth provider type: {}. Expected 'authkit' or 'oidc'", provider_type)
         }
-
-        serde_json::from_str(&config_json).context("Failed to parse auth_config JSON")
     }
 
     /// Build provider registry from configuration
     pub fn build_registry(&self) -> ProviderRegistry {
         let mut registry = ProviderRegistry::new();
 
-        for provider_config in &self.providers {
+        if let Some(provider_config) = &self.provider {
             match provider_config {
                 ProviderConfig::AuthKit {
                     issuer,
@@ -114,59 +178,65 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_config_parsing() {
-        let json = r#"{
-            "mcp_gateway_url": "http://gateway.internal",
-            "trace_id_header": "X-Request-ID",
-            "enabled": true,
-            "providers": [
-                {
-                    "type": "authkit",
-                    "issuer": "https://example.authkit.app",
-                    "audience": "my-api"
-                },
-                {
-                    "type": "oidc",
-                    "name": "auth0",
-                    "issuer": "https://example.auth0.com",
-                    "jwks_uri": "https://example.auth0.com/.well-known/jwks.json",
-                    "authorization_endpoint": "https://example.auth0.com/authorize",
-                    "token_endpoint": "https://example.auth0.com/oauth/token",
-                    "allowed_domains": ["*.auth0.com"]
-                }
-            ]
-        }"#;
+    fn test_authkit_provider_config() {
+        let provider = ProviderConfig::AuthKit {
+            issuer: "https://example.authkit.app".to_string(),
+            jwks_uri: None,
+            audience: Some("my-api".to_string()),
+        };
 
-        let config: GatewayConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(config.providers.len(), 2);
-        assert_eq!(config.trace_id_header, "X-Request-ID");
-        assert!(config.enabled);
+        // Test serialization
+        let json = serde_json::to_string(&provider).unwrap();
+        assert!(json.contains("authkit"));
+        assert!(json.contains("https://example.authkit.app"));
     }
 
     #[test]
-    fn test_config_parsing_with_auth_disabled() {
-        let json = r#"{
-            "mcp_gateway_url": "http://gateway.internal",
-            "trace_id_header": "X-Request-ID",
-            "enabled": false,
-            "providers": []
-        }"#;
+    fn test_oidc_provider_config() {
+        let provider = ProviderConfig::Oidc {
+            name: "auth0".to_string(),
+            issuer: "https://example.auth0.com".to_string(),
+            jwks_uri: "https://example.auth0.com/.well-known/jwks.json".to_string(),
+            audience: Some("my-api".to_string()),
+            authorization_endpoint: "https://example.auth0.com/authorize".to_string(),
+            token_endpoint: "https://example.auth0.com/oauth/token".to_string(),
+            userinfo_endpoint: None,
+            allowed_domains: vec!["*.auth0.com".to_string()],
+        };
 
-        let config: GatewayConfig = serde_json::from_str(json).unwrap();
+        // Test serialization
+        let json = serde_json::to_string(&provider).unwrap();
+        assert!(json.contains("oidc"));
+        assert!(json.contains("auth0"));
+    }
+
+    #[test]
+    fn test_gateway_config_with_provider() {
+        let config = GatewayConfig {
+            mcp_gateway_url: "http://gateway.internal".to_string(),
+            trace_id_header: "X-Request-ID".to_string(),
+            enabled: true,
+            provider: Some(ProviderConfig::AuthKit {
+                issuer: "https://example.authkit.app".to_string(),
+                jwks_uri: None,
+                audience: None,
+            }),
+        };
+
+        assert!(config.enabled);
+        assert!(config.provider.is_some());
+    }
+
+    #[test]
+    fn test_gateway_config_without_provider() {
+        let config = GatewayConfig {
+            mcp_gateway_url: "http://gateway.internal".to_string(),
+            trace_id_header: "X-Request-ID".to_string(),
+            enabled: false,
+            provider: None,
+        };
+
         assert!(!config.enabled);
-        assert_eq!(config.providers.len(), 0);
-    }
-
-    #[test]
-    fn test_config_parsing_defaults_enabled() {
-        // Test that enabled defaults to true when not specified
-        let json = r#"{
-            "mcp_gateway_url": "http://gateway.internal",
-            "trace_id_header": "X-Request-ID",
-            "providers": []
-        }"#;
-
-        let config: GatewayConfig = serde_json::from_str(json).unwrap();
-        assert!(config.enabled);
+        assert!(config.provider.is_none());
     }
 }
