@@ -4,10 +4,10 @@ Spin templates for building MCP servers and tools with FTL.
 
 ## Templates
 
-- **ftl-mcp-server** - MCP server with FTL gateway
+- **ftl-mcp-server** - MCP server with FTL gateway and auth support (disabled by default)
 - **ftl-mcp-rust** - Rust tool component
 - **ftl-mcp-ts** - TypeScript tool component
-- **ftl-auth-gateway** - WorkOS AuthKit authentication
+- **ftl-auth-gateway** - WorkOS AuthKit authentication (for adding to existing projects)
 
 ## Installation
 
@@ -61,10 +61,14 @@ curl -X POST http://localhost:3000/mcp \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"greeting","arguments":{"message":"Hello"}},"id":2}'
 ```
 
-## Adding Authentication
+## Authentication
+
+The `ftl-mcp-server` template includes authentication support that is **disabled by default**. To enable authentication, update the `auth_config` variable in your `spin.toml` file with `"enabled": true` and configure your authentication providers.
+
+For existing projects without authentication support, you can add it using:
 
 ```bash
 spin add -t ftl-auth-gateway
 ```
 
-Follow instructions in `AUTH_SETUP.md` to configure AuthKit.
+See the Authentication section in your project's README.md for configuration details.

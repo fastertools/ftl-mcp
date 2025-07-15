@@ -22,6 +22,7 @@ fn default_enabled() -> bool {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ProviderConfig {
+    #[serde(rename = "authkit")]
     AuthKit {
         issuer: String,
         #[serde(default)]
