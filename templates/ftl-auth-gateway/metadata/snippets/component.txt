@@ -1,25 +1,56 @@
 # IMPORTANT: This snippet modifies the existing MCP gateway configuration
-# The auth gateway will handle /mcp and forward to /mcp-internal
+# The auth gateway will handle /mcp and forward to the internal MCP gateway
 
-# First, update the existing ftl-mcp-gateway to use /mcp-internal
-# You'll need to manually update the existing [[trigger.http]] section for ftl-mcp-gateway:
-# Change: route = "/mcp"
-# To:     route = "/mcp-internal"
+# First, update the existing mcp component trigger to use a private route:
+# Change:
+#   [[trigger.http]]
+#   route = "/mcp"
+#   component = "mcp"
+# To:
+#   [[trigger.http]]
+#   route = { private = true }
+#   component = "ftl-mcp-gateway"
 
-# Add auth gateway configuration
+# Add required variables
+[variables]
+authkit_issuer = { required = true }
+
+# Auth Gateway - handles authentication and OAuth discovery
 [[trigger.http]]
 route = "/mcp"
-component = "ftl-auth-gateway"
+component = "mcp"
 
 [[trigger.http]]
-route = "/.well-known/..."
-component = "ftl-auth-gateway"
+route = "/.well-known/oauth-protected-resource"
+component = "mcp"
 
-[component.ftl-auth-gateway]
-source = { registry = "ghcr.io", package = "fastertools:ftl-auth-gateway", version = "0.0.1" }
-allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app", "{{authkit-issuer}}"]
-[component.ftl-auth-gateway.variables]
-authkit_issuer = "{{authkit-issuer}}"
-authkit_audience = "{{authkit-audience}}"
-authkit_jwks_uri = "{{authkit-jwks-uri}}"
-mcp_gateway_url = "http://ftl-mcp-gateway.spin.internal/mcp-internal"
+[[trigger.http]]
+route = "/.well-known/oauth-authorization-server"
+component = "mcp"
+
+[component.mcp]
+source = { registry = "ghcr.io", package = "fastertools:ftl-auth-gateway", version = "0.0.2" }
+allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app"]
+[component.mcp.variables]
+auth_config = '''
+{
+  "mcp_gateway_url": "http://ftl-mcp-gateway.spin.internal/mcp-internal",
+  "trace_id_header": "X-Trace-Id",
+  "providers": [{
+    "type": "auth_kit",
+    "issuer": "{% raw %}{{ authkit_issuer }}{% endraw %}"
+  }]
+}
+'''
+
+# MCP Gateway - internal endpoint (protected by auth gateway)
+[[trigger.http]]
+route = { private = true }
+component = "ftl-mcp-gateway"
+
+[component.ftl-mcp-gateway]
+source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.3" }
+allowed_outbound_hosts = ["http://*.spin.internal"]
+[component.ftl-mcp-gateway.variables]
+tool_components = "{% raw %}{{ tool_components }}{% endraw %}"
+validate_arguments = "true"
