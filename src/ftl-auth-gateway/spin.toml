@@ -6,6 +6,21 @@ version = "0.0.1"
 authors = ["FTL Contributors"]
 description = "Authentication gateway for FTL MCP servers"
 
+[variables]
+# These defaults are used for spin test
+auth_enabled = { default = "true" }
+auth_gateway_url = { default = "http://test-gateway.internal/mcp-internal" }
+auth_trace_header = { default = "X-Trace-Id" }
+auth_provider_type = { default = "authkit" }
+auth_provider_issuer = { default = "https://test.authkit.app" }
+auth_provider_audience = { default = "" }
+auth_provider_jwks_uri = { default = "https://test.authkit.app/.well-known/jwks.json" }
+auth_provider_name = { default = "" }
+auth_provider_authorize_endpoint = { default = "" }
+auth_provider_token_endpoint = { default = "" }
+auth_provider_userinfo_endpoint = { default = "" }
+auth_provider_allowed_domains = { default = "" }
+
 [[trigger.http]]
 route = "/..."
 component = "ftl-auth-gateway"
@@ -18,9 +33,23 @@ command = "cargo build --target wasm32-wasip1 --release"
 workdir = "."
 watch = ["src/**/*.rs", "Cargo.toml"]
 [component.ftl-auth-gateway.variables]
-# Required: JSON configuration for authentication providers
-# Default is an empty provider list - must be configured for production use
-auth_config = ""
+# Core auth settings
+auth_enabled = "{{ auth_enabled }}"
+auth_gateway_url = "{{ auth_gateway_url }}"
+auth_trace_header = "{{ auth_trace_header }}"
+
+# Provider configuration
+auth_provider_type = "{{ auth_provider_type }}"
+auth_provider_issuer = "{{ auth_provider_issuer }}"
+auth_provider_audience = "{{ auth_provider_audience }}"
+
+# OIDC-specific settings
+auth_provider_name = "{{ auth_provider_name }}"
+auth_provider_jwks_uri = "{{ auth_provider_jwks_uri }}"
+auth_provider_authorize_endpoint = "{{ auth_provider_authorize_endpoint }}"
+auth_provider_token_endpoint = "{{ auth_provider_token_endpoint }}"
+auth_provider_userinfo_endpoint = "{{ auth_provider_userinfo_endpoint }}"
+auth_provider_allowed_domains = "{{ auth_provider_allowed_domains }}"
 
 # Test configuration
 [component.ftl-auth-gateway.tool.spin-test]

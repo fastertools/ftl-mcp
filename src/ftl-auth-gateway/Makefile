@@ -4,9 +4,18 @@
 build:
 	cargo build --target wasm32-wasip1 --release
 
-# Run tests
-test:
+# Build the component for publishing
+build-component:
+	cargo component build --target wasm32-wasip1 --release
+
+test-cargo:
 	cargo test
+
+test-spin:
+	spin test
+
+# Run tests
+test: test-cargo test-spin
 
 # Clean build artifacts
 clean:
@@ -32,7 +41,7 @@ release: clean
 	cargo build --target wasm32-wasip1 --release
 	@echo "Release build complete: target/wasm32-wasip1/release/ftl_auth_gateway.wasm"
 
-publish:
+publish: build-component
 	@VERSION=$$(cargo read-manifest | jq -r .version) && \
 	wkg oci push ghcr.io/fastertools/ftl-auth-gateway:$$VERSION target/wasm32-wasip1/release/ftl_auth_gateway.wasm
 	wkg oci push ghcr.io/fastertools/ftl-auth-gateway:latest target/wasm32-wasip1/release/ftl_auth_gateway.wasm
