@@ -24,14 +24,28 @@ spin build --up
 
 The MCP endpoint will be available at `http://localhost:3000/mcp`
 
-### With Authentication (AuthKit)
+### With Authentication
+
+Authentication is now controlled via the `auth_config` variable. By default, authentication is disabled. To enable it, override the configuration:
 
 ```bash
-# Set your AuthKit issuer URL via environment variable
-SPIN_VARIABLE_AUTHKIT_ISSUER="https://your-tenant.authkit.app" spin build --up -f spin-auth.toml
+# Example with AuthKit
+export SPIN_VARIABLE_AUTH_CONFIG='{
+  "mcp_gateway_url": "http://ftl-mcp-gateway.spin.internal/mcp-internal",
+  "trace_id_header": "X-Trace-Id",
+  "enabled": true,
+  "providers": [{
+    "type": "authkit",
+    "issuer": "https://your-tenant.authkit.app"
+  }]
+}'
+
+spin build --up
 ```
 
-The authenticated MCP endpoint will be available at `http://localhost:3000/mcp` and requires a valid JWT token from AuthKit.
+For more authentication examples and provider configurations, see `.env.example`.
+
+The authenticated MCP endpoint will be available at `http://localhost:3000/mcp` and requires a valid JWT token from the configured provider.
 
 ## Testing
 

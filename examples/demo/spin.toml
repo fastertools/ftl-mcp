@@ -8,18 +8,72 @@ description = "FTL MCP server for hosting MCP tools"
 
 [variables]
 tool_components = { default = "echo-rs,echo-ts,weather-rs,weather-ts" }
+# ========================================
+# Available auth provider configurations
+# ========================================
 
+# AuthKit:
+# {
+#   "type": "authkit",
+#   "issuer": "https://your-tenant.authkit.app",
+#   "audience": "mcp-api"  // optional
+# }
+
+# Generic OIDC (Auth0, Keycloak, etc):
+# {
+#   "type": "oidc",
+#   "name": "auth0",
+#   "issuer": "https://your-domain.auth0.com",
+#   "jwks_uri": "https://your-domain.auth0.com/.well-known/jwks.json",
+#   "authorization_endpoint": "https://your-domain.auth0.com/authorize",
+#   "token_endpoint": "https://your-domain.auth0.com/oauth/token",
+#   "userinfo_endpoint": "https://your-domain.auth0.com/userinfo",  // optional
+#   "audience": "your-api-identifier",  // optional
+#   "allowed_domains": ["*.auth0.com"]  // optional
+# }
+# Auth gateway configuration - auth is DISABLED by default
+# To enable auth, set SPIN_VARIABLE_AUTH_CONFIG with your auth configuration or edit the block below.
+auth_config = { default = '''
+{
+  "mcp_gateway_url": "http://ftl-mcp-gateway.spin.internal/mcp-internal",
+  "trace_id_header": "X-Trace-Id",
+  "enabled": false,
+  "providers": []
+}
+''' }
+
+# Main MCP endpoint - uses auth gateway which can be disabled via auth_config
 [[trigger.http]]
 route = "/mcp"
 component = "mcp"
 
+[[trigger.http]]
+route = "/.well-known/oauth-protected-resource"
+component = "mcp"
+
+[[trigger.http]]
+route = "/.well-known/oauth-authorization-server"
+component = "mcp"
+
 [component.mcp]
+source = { registry = "ghcr.io", package = "fastertools:ftl-auth-gateway", version = "0.0.4" }
+allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app"]
+[component.mcp.variables]
+auth_config = "{{ auth_config }}"
+
+# MCP Gateway - internal endpoint
+[[trigger.http]]
+route = { private = true }
+component = "ftl-mcp-gateway"
+
+[component.ftl-mcp-gateway]
 source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.3" }
 allowed_outbound_hosts = ["http://*.spin.internal"]
-[component.mcp.variables]
+[component.ftl-mcp-gateway.variables]
 tool_components = "{{ tool_components }}"
 validate_arguments = "true"
 
+# Echo tool (Rust)
 [[trigger.http]]
 route = { private = true }
 component = "echo-rs"
@@ -36,6 +90,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 # in the [variables] section at the top of spin.toml to include "echo-rs"
 # Example: tool_components = { default = "existing-tool,echo-rs" }
 
+# Echo tool (TypeScript)
 [[trigger.http]]
 route = { private = true }
 component = "echo-ts"
@@ -52,6 +107,7 @@ watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 # in the [variables] section at the top of spin.toml to include "echo-ts"
 # Example: tool_components = { default = "existing-tool,echo-ts" }
 
+# Weather tool (Rust)
 [[trigger.http]]
 route = { private = true }
 component = "weather-rs"
@@ -68,6 +124,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 # in the [variables] section at the top of spin.toml to include "weather-rs"
 # Example: tool_components = { default = "existing-tool,weather-rs" }
 
+# Weather tool (TypeScript)
 [[trigger.http]]
 route = { private = true }
 component = "weather-ts"

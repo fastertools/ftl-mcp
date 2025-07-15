@@ -11,9 +11,18 @@
 #   route = { private = true }
 #   component = "ftl-mcp-gateway"
 
-# Add required variables
+# Auth Gateway Configuration
+# By default, authentication is disabled. To enable authentication, override 
+# the auth_config variable when running the application.
 [variables]
-authkit_issuer = { required = true }
+auth_config = { default = '''
+{
+  "mcp_gateway_url": "http://ftl-mcp-gateway.spin.internal/mcp-internal",
+  "trace_id_header": "X-Trace-Id",
+  "enabled": false,
+  "providers": []
+}
+''' }
 
 # Auth Gateway - handles authentication and OAuth discovery
 [[trigger.http]]
@@ -29,19 +38,10 @@ route = "/.well-known/oauth-authorization-server"
 component = "mcp"
 
 [component.mcp]
-source = { registry = "ghcr.io", package = "fastertools:ftl-auth-gateway", version = "0.0.2" }
+source = { registry = "ghcr.io", package = "fastertools:ftl-auth-gateway", version = "0.0.4" }
 allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app"]
 [component.mcp.variables]
-auth_config = '''
-{
-  "mcp_gateway_url": "http://ftl-mcp-gateway.spin.internal/mcp-internal",
-  "trace_id_header": "X-Trace-Id",
-  "providers": [{
-    "type": "auth_kit",
-    "issuer": "{% raw %}{{ authkit_issuer }}{% endraw %}"
-  }]
-}
-'''
+auth_config = "{% raw %}{{ auth_config }}{% endraw %}"
 
 # MCP Gateway - internal endpoint (protected by auth gateway)
 [[trigger.http]]
