@@ -2,7 +2,7 @@
 name = "ftl-auth-gateway"
 authors = ["FTL Contributors"]
 description = "Authentication gateway for FTL MCP servers using AuthKit"
-version = "0.0.2"
+version = "0.0.3"
 license = "Apache-2.0"
 rust-version = "1.70"
 edition = "2021"

@@ -19,12 +19,44 @@ use logging::{get_trace_id, Logger};
 async fn handle_request(req: Request) -> Result<impl IntoResponse> {
     // Load gateway configuration
     let config = GatewayConfig::from_spin_vars()?;
+    
+    // Check if authentication is enabled right at the entry point
+    if !config.enabled {
+        // Bypass everything and forward directly to MCP gateway
+        let trace_id = get_trace_id(&req, &config.trace_id_header);
+        let logger = Logger::new(&trace_id);
+        
+        logger
+            .info("Authentication disabled, forwarding request directly")
+            .emit();
+        
+        let auth_config = auth::AuthConfig {
+            mcp_gateway_url: config.mcp_gateway_url.clone(),
+        };
+        
+        match proxy::forward_to_mcp_gateway(req, &auth_config, None, &trace_id).await {
+            Ok(response) => return Ok(response),
+            Err(e) => {
+                logger
+                    .error("Failed to forward request to MCP gateway")
+                    .field("error", &e)
+                    .emit();
+                return Ok(
+                    spin_sdk::http::Response::builder()
+                        .status(502)
+                        .body(format!("Gateway error: {e}"))
+                        .build()
+                );
+            }
+        }
+    }
+
+    // Authentication is enabled, proceed with normal auth flow
     let registry = config.build_registry();
 
     // Extract trace ID for structured logging
     let trace_id = get_trace_id(&req, &config.trace_id_header);
     let logger = Logger::new(&trace_id);
-
 
     let path = req.path();
     let method = req.method();

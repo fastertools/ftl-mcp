@@ -9,7 +9,13 @@ use crate::providers::{AuthKitProvider, OidcProvider, OidcProviderConfig, Provid
 pub struct GatewayConfig {
     pub mcp_gateway_url: String,
     pub trace_id_header: String,
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
     pub providers: Vec<ProviderConfig>,
+}
+
+fn default_enabled() -> bool {
+    true
 }
 
 /// Provider configuration enum
@@ -49,6 +55,7 @@ impl GatewayConfig {
             return Ok(Self {
                 mcp_gateway_url: "http://ftl-mcp-gateway.spin.internal/mcp-internal".to_string(),
                 trace_id_header: "X-Trace-Id".to_string(),
+                enabled: true,
                 providers: vec![],
             });
         }
@@ -110,6 +117,7 @@ mod tests {
         let json = r#"{
             "mcp_gateway_url": "http://gateway.internal",
             "trace_id_header": "X-Request-ID",
+            "enabled": true,
             "providers": [
                 {
                     "type": "authkit",
@@ -131,5 +139,33 @@ mod tests {
         let config: GatewayConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.providers.len(), 2);
         assert_eq!(config.trace_id_header, "X-Request-ID");
+        assert!(config.enabled);
+    }
+
+    #[test]
+    fn test_config_parsing_with_auth_disabled() {
+        let json = r#"{
+            "mcp_gateway_url": "http://gateway.internal",
+            "trace_id_header": "X-Request-ID",
+            "enabled": false,
+            "providers": []
+        }"#;
+
+        let config: GatewayConfig = serde_json::from_str(json).unwrap();
+        assert!(!config.enabled);
+        assert_eq!(config.providers.len(), 0);
+    }
+
+    #[test]
+    fn test_config_parsing_defaults_enabled() {
+        // Test that enabled defaults to true when not specified
+        let json = r#"{
+            "mcp_gateway_url": "http://gateway.internal",
+            "trace_id_header": "X-Request-ID",
+            "providers": []
+        }"#;
+
+        let config: GatewayConfig = serde_json::from_str(json).unwrap();
+        assert!(config.enabled);
     }
 }
