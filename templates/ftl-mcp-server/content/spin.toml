@@ -11,11 +11,11 @@ tool_components = { default = "" }
 
 [[trigger.http]]
 route = "/mcp"
-component = "ftl-mcp-gateway"
+component = "mcp"
 
-[component.ftl-mcp-gateway]
+[component.mcp]
 source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.3" }
 allowed_outbound_hosts = ["http://*.spin.internal"]
-[component.ftl-mcp-gateway.variables]
+[component.mcp.variables]
 tool_components = "{% raw %}{{ tool_components }}{% endraw %}"
 validate_arguments = "true"

@@ -12,13 +12,21 @@ authkit_issuer = { required = true }
 
 # Auth Gateway - handles authentication and OAuth discovery
 [[trigger.http]]
-route = "/..."
-component = "ftl-auth-gateway"
+route = "/mcp"
+component = "mcp"
 
-[component.ftl-auth-gateway]
+[[trigger.http]]
+route = "/.well-known/oauth-protected-resource"
+component = "mcp"
+
+[[trigger.http]]
+route = "/.well-known/oauth-authorization-server"
+component = "mcp"
+
+[component.mcp]
 source = { registry = "ghcr.io", package = "fastertools:ftl-auth-gateway", version = "0.0.2" }
 allowed_outbound_hosts = ["http://*.spin.internal", "https://*.authkit.app"]
-[component.ftl-auth-gateway.variables]
+[component.mcp.variables]
 auth_config = '''
 {
   "mcp_gateway_url": "http://ftl-mcp-gateway.spin.internal/mcp-internal",
@@ -32,7 +40,7 @@ auth_config = '''
 
 # MCP Gateway - internal endpoint (protected by auth gateway)
 [[trigger.http]]
-route = "/mcp-internal"
+route = { private = true }
 component = "ftl-mcp-gateway"
 
 [component.ftl-mcp-gateway]
@@ -44,7 +52,7 @@ validate_arguments = "true"
 
 # Echo tool (Rust)
 [[trigger.http]]
-route = "/echo-rs"
+route = { private = true }
 component = "echo-rs"
 
 [component.echo-rs]
@@ -57,7 +65,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 
 # Echo tool (TypeScript)
 [[trigger.http]]
-route = "/echo-ts"
+route = { private = true }
 component = "echo-ts"
 
 [component.echo-ts]
@@ -70,7 +78,7 @@ watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 
 # Weather tool (Rust)
 [[trigger.http]]
-route = "/weather-rs"
+route = { private = true }
 component = "weather-rs"
 
 [component.weather-rs]
@@ -83,7 +91,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 
 # Weather tool (TypeScript)
 [[trigger.http]]
-route = "/weather-ts"
+route = { private = true }
 component = "weather-ts"
 
 [component.weather-ts]
