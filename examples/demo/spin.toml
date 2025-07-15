@@ -38,7 +38,12 @@ auth_config = { default = '''
   "mcp_gateway_url": "http://ftl-mcp-gateway.spin.internal/mcp-internal",
   "trace_id_header": "X-Trace-Id",
   "enabled": false,
-  "providers": []
+  "providers": [
+    {
+      "type": "authkit",
+      "issuer": "https://your-tenant.authkit.app"
+    }
+  ]
 }
 ''' }
 

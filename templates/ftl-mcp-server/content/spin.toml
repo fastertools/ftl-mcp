@@ -8,12 +8,43 @@ description = "{{project-description}}"
 
 [variables]
 tool_components = { default = "" }
+# ========================================
+# Available auth provider configurations
+# ========================================
+
+# AuthKit:
+# {
+#   "type": "authkit",
+#   "issuer": "https://your-tenant.authkit.app",
+#   "audience": "mcp-api"  // optional
+# }
+
+# Generic OIDC (Auth0, Keycloak, etc):
+# {
+#   "type": "oidc",
+#   "name": "auth0",
+#   "issuer": "https://your-domain.auth0.com",
+#   "jwks_uri": "https://your-domain.auth0.com/.well-known/jwks.json",
+#   "authorization_endpoint": "https://your-domain.auth0.com/authorize",
+#   "token_endpoint": "https://your-domain.auth0.com/oauth/token",
+#   "userinfo_endpoint": "https://your-domain.auth0.com/userinfo",  // optional
+#   "audience": "your-api-identifier",  // optional
+#   "allowed_domains": ["*.auth0.com"]  // optional
+# }
+#
+# Auth gateway configuration - auth is DISABLED by default
+# To enable auth, set SPIN_VARIABLE_AUTH_CONFIG with your auth configuration or edit the block below.
 auth_config = { default = '''
 {
   "mcp_gateway_url": "http://ftl-mcp-gateway.spin.internal/mcp-internal",
   "trace_id_header": "X-Trace-Id",
   "enabled": false,
-  "providers": []
+  "providers": [
+    {
+      "type": "authkit",
+      "issuer": "https://your-tenant.authkit.app"
+    }
+  ]
 }
 ''' }
 
