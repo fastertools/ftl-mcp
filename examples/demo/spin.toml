@@ -11,17 +11,17 @@ tool_components = { default = "echo-rs,echo-ts,weather-rs,weather-ts" }
 
 [[trigger.http]]
 route = "/mcp"
-component = "ftl-mcp-gateway"
+component = "mcp"
 
-[component.ftl-mcp-gateway]
+[component.mcp]
 source = { registry = "ghcr.io", package = "fastertools:ftl-mcp-gateway", version = "0.0.3" }
 allowed_outbound_hosts = ["http://*.spin.internal"]
-[component.ftl-mcp-gateway.variables]
+[component.mcp.variables]
 tool_components = "{{ tool_components }}"
 validate_arguments = "true"
 
 [[trigger.http]]
-route = "/echo-rs"
+route = { private = true }
 component = "echo-rs"
 
 [component.echo-rs]
@@ -37,7 +37,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 # Example: tool_components = { default = "existing-tool,echo-rs" }
 
 [[trigger.http]]
-route = "/echo-ts"
+route = { private = true }
 component = "echo-ts"
 
 [component.echo-ts]
@@ -53,7 +53,7 @@ watch = ["src/**/*.ts", "package.json", "tsconfig.json"]
 # Example: tool_components = { default = "existing-tool,echo-ts" }
 
 [[trigger.http]]
-route = "/weather-rs"
+route = { private = true }
 component = "weather-rs"
 
 [component.weather-rs]
@@ -69,7 +69,7 @@ watch = ["src/**/*.rs", "Cargo.toml"]
 # Example: tool_components = { default = "existing-tool,weather-rs" }
 
 [[trigger.http]]
-route = "/weather-ts"
+route = { private = true }
 component = "weather-ts"
 
 [component.weather-ts]

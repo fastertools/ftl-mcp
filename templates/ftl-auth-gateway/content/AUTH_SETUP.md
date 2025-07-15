@@ -39,11 +39,3 @@ curl -X POST http://localhost:3000/mcp \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
 ```
-
-## 4. Metadata Endpoints
-
-The auth gateway also provides:
-- `/.well-known/openid-configuration` - OpenID Connect discovery
-- `/.well-known/jwks.json` - JSON Web Key Set
-
-These endpoints are useful for MCP clients that support automatic authentication configuration.
